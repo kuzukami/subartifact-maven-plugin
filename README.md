@@ -1,0 +1,1 @@
+# subartifact-maven-plugin
