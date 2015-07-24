@@ -1,0 +1,309 @@
+package jp.co.iidev.subartifact1.divider1;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Parent;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.AbstractContext;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.context.IContext;
+import org.thymeleaf.templatemode.StandardTemplateModeHandlers;
+import org.thymeleaf.templateresolver.FileTemplateResolver;
+
+import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
+import com.google.common.base.Predicate;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.Maps;
+import com.google.common.io.Files;
+import com.google.common.io.Resources;
+
+import jp.co.iidev.subartifact1.api.SubArtifactDefinition;
+import jp.co.iidev.subartifact1.divider1.DivisonExecutor.SubArtifactDeployment;
+
+public class PomSetGenerator {
+	final Path fullArtifactPomRelative;
+	final Path pomSetGenerationDir;
+
+	public PomSetGenerator(Path fullArtifactPom, Path pomSetGenerationDir) {
+		this.pomSetGenerationDir = pomSetGenerationDir;
+		this.fullArtifactPomRelative = pomSetGenerationDir
+				.resolve("tesueito")//once deeper 
+				.relativize(fullArtifactPom);
+	}
+
+	public static class GenProject {
+		final Model project;
+		final List<ObjectTypeClassName> includeclasses;
+		final FullArtifact fullartifact;
+
+		protected GenProject(Model project,
+				List<ObjectTypeClassName> includeclasses,
+				FullArtifact mainartifact) {
+			super();
+			this.project = project;
+			this.includeclasses = includeclasses;
+			this.fullartifact = mainartifact;
+		}
+
+		public FullArtifact getFullartifact() {
+			return fullartifact;
+		}
+
+		public Model getProject() {
+			return project;
+		}
+
+		public List<ObjectTypeClassName> getIncludeclasses() {
+			return includeclasses;
+		}
+
+		public static class FullArtifact {
+			final Model project;
+			final String resolvedClassifier;
+			final String resolvedGroupId;
+
+			public Model getProject() {
+				return project;
+			}
+
+			public String getResolvedClassifier() {
+				return resolvedClassifier;
+			}
+
+			public String getResolvedGroupId() {
+				return resolvedGroupId;
+			}
+
+			protected FullArtifact(Model project, String classifier,
+					String groupId) {
+				super();
+				this.project = project;
+				this.resolvedClassifier = classifier;
+				this.resolvedGroupId = groupId;
+			}
+
+
+		}
+	}
+	
+	private Dependency d( String grp, String art){
+		Dependency d = new Dependency();
+		d.setGroupId(grp);
+		d.setArtifactId(art);
+		return d;
+	}
+	
+	//test only
+//	private static Dependency buildDep( File f ){
+//		Map<String,Dependency> pat2Dep = 
+//				Maps.newLinkedHashMap();
+//		
+//		
+//		pat2Dep.put(
+//				"guava-13.0.1.jar"
+//				, d("com.google.guava", "guava") );
+//		
+//		pat2Dep.put(
+//				"commons-primitives-1.0.jar"
+//				,
+//				d("commons-primitives", "commons-primitives"));
+//		
+//		return pat2Dep.get( f.getName() );
+//		
+//	}
+	
+	private static GenProject buildValueModel(
+			String groupId, String version,
+			SubArtifactDeployment deploymentDescription,
+			Path fullArtifactPomRelative,
+			Model fullArtfactMainPOM,
+			Predicate<File> usableJAR
+			){
+		
+		List<ObjectTypeClassName> incclasses = 
+		FluentIterable.from( deploymentDescription.getDeployClassNames() )
+		.transform( ObjectTypeClassName::forClassName )
+//		.toImmutableList()
+		.toList()
+		;
+		
+		Model m = new Model();
+		
+		m.setArtifactId(deploymentDescription.getTarget().getArtifactId());
+		m.setGroupId(groupId);
+		m.setVersion(version);
+		m.setPackaging("jar");
+		m.setName(deploymentDescription.getTarget().toString());
+		
+		for ( Map.Entry<File,Dependency> jar :
+				Maps.filterKeys( deploymentDescription.getJarDeps(), usableJAR )
+				.entrySet() ){
+			Dependency d = jar.getValue();;
+//			if ( d != null )
+			m.addDependency( d );
+		}
+		
+		Parent p;
+		if ( fullArtfactMainPOM.getParent() == null ){
+			p = null;
+		}else{
+			p = fullArtfactMainPOM.getParent().clone();
+			if ( p.getRelativePath() != null )
+				p.setRelativePath(
+						Joiner.on("/").join(
+						fullArtifactPomRelative.getParent()
+							.resolve( p.getRelativePath() )
+							)
+							);
+		}
+		m.setParent( p );
+		
+		
+		return new GenProject(m, incclasses, new GenProject.FullArtifact(fullArtfactMainPOM, null, groupId));
+		
+	}
+	
+
+	public void generate(
+			String groupId, String version,
+			LinkedHashMap<SubArtifactDefinition, DivisonExecutor.SubArtifactDeployment> generatesBySequence
+			, Predicate<File> usableJARs
+			) throws IOException, XmlPullParserException {
+		for (Map.Entry<SubArtifactDefinition, DivisonExecutor.SubArtifactDeployment> me : generatesBySequence
+				.entrySet()) {
+//			if ( me.getKey() != JavaLibSubModuleV2.core ) continue;
+			SubArtifactDefinition def = me.getKey();
+			SubArtifactDeployment dep = me.getValue();
+
+			String artid = def.getArtifactId();
+			Path pomPath = pomSetGenerationDir.resolve(artid);
+			File genDir = pomPath.toFile();
+			genDir.mkdirs();
+			File tempatePomFile = new File( genDir, "template-pom.xml" );
+			if ( !tempatePomFile.exists() ){
+				//outtput default template
+				byte[] x= Resources.toByteArray( Resources.getResource("template-pom.xml") );
+				Files.write(x, tempatePomFile);
+			}
+			File genPomFile = new File( genDir, "pom.xml" );
+			
+			File fullArtifactPomFile = pomPath.resolve( fullArtifactPomRelative ) .toFile();
+			Model fullPom = new MavenXpp3Reader().read(new FileInputStream(fullArtifactPomFile));
+			
+			GenProject ge = buildValueModel(
+					groupId,
+					version,
+					dep
+					, fullArtifactPomRelative
+					, fullPom
+					, usableJARs
+					);
+
+			String renderedXML = Thymeleafs.start()
+					.add("genproject", ge)
+					.render(tempatePomFile);
+			Files.write(renderedXML, genPomFile, Charsets.UTF_8);
+		}
+	}
+
+	/**
+	 * Low performance but Sufficient Implementation.
+	 * 
+	 * @author kuzukami
+	 *
+	 */
+	private static class Thymeleafs {
+		private final static Map<String, Object> globalEnvironments = Collections
+				.synchronizedMap(Maps.<String, Object> newHashMap());
+
+		// public static OnMemoryTemplateResolver staticMemoryTemplateResolver =
+		// new OnMemoryTemplateResolver();
+		private static FileTemplateResolver resolver() {
+			FileTemplateResolver resolver = new FileTemplateResolver();
+			resolver.setTemplateMode(
+					StandardTemplateModeHandlers.XML.getTemplateModeName());
+			// resolver.setPrefix("/WEB-INF/templates/");
+			resolver.setCacheable(true);
+			resolver.setCacheTTLMs(60000L);
+			resolver.setCharacterEncoding("utf-8");
+			return resolver;
+		}
+
+		private static TemplateEngine engine() {
+			TemplateEngine engine = new TemplateEngine();
+			engine.setTemplateResolver(resolver());
+			return engine;
+		}
+
+		public static RuntimeEnvironment start() {
+			return new RuntimeEnvironment(Maps.newHashMap(globalEnvironments));
+		}
+
+		public static class RuntimeEnvironment {
+			protected Map<String, Object> environmentBase;
+
+			private RuntimeEnvironment(Map<String, Object> environmentBase) {
+				super();
+				this.environmentBase = environmentBase;
+			}
+
+			public RuntimeEnvironment add(String variable, Object env) {
+				environmentBase.put(variable, env);
+				return this;
+			}
+
+			public RuntimeEnvironment addIfNotNull(String variable,
+					Object env) {
+				if (env != null)
+					add(variable, env);
+				return this;
+			}
+
+			public RuntimeEnvironment addArtifact(String prefix,
+					Dependency dep) {
+				return add(prefix + ".groupId", dep.getGroupId())
+						.add(prefix + ".artifactId", dep.getArtifactId())
+						.add(prefix + ".version", dep.getVersion())
+						.add(prefix + ".scope", dep.getScope())
+						.add(prefix + ".classifier", dep.getClassifier());
+			}
+
+			<C extends AbstractContext> C initializeContext(C web) {
+				for (Map.Entry<String, Object> m : environmentBase.entrySet())
+					web.setVariable(m.getKey(), m.getValue());
+				return web;
+			}
+
+			public String render(File templateName) {
+				return renderXML(templateName, this);
+			}
+		}
+
+		static void installGlobalVariableValue(String variable, Object env) {
+			globalEnvironments.put(variable, env);
+		}
+
+		static String renderXML(File templateName, RuntimeEnvironment context) {
+			Context cx = new Context();
+			context.initializeContext(cx);
+			return engine().process(templateName.getAbsolutePath(), cx);
+		}
+
+		static String renderXML(File templateName, IContext context) {
+			return engine().process(templateName.getAbsolutePath(), context);
+		}
+
+	}
+}

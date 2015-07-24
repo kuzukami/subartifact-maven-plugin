@@ -1,0 +1,86 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<artifactId th:text="${genproject.project.artifactId}">javalib8-core</artifactId>
+	<name th:text="${genproject.project.name}">iidev javalib core</name>
+	<version th:text="${genproject.project.version}">0.0.1-SNAPSHOT</version>
+	<packaging th:text="${genproject.project.packaging}">jar</packaging>
+	<properties>
+		<source.version>1.8</source.version>
+		<target.version>1.8</target.version>
+		<encoding>UTF-8</encoding>
+	</properties>
+	<profiles>
+	</profiles>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>${source.version}</source>
+					<target>${target.version}</target>
+					<encoding>${encoding}</encoding>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>2.4.1</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<promoteTransitiveDependencies>false</promoteTransitiveDependencies>
+							<createDependencyReducedPom>true</createDependencyReducedPom>
+							<artifactSet>
+								<includes>
+									<include th:text="${genproject.fullartifact.resolvedGroupId}+':'+${genproject.fullartifact.project.artifactId}">jp.co.iidev:JavaLib</include>
+								</includes>
+								<!-- 
+								<excludes>
+									<exclude>*:*</exclude>
+								</excludes>
+								 -->
+							</artifactSet>
+							<filters>
+								<filter>
+									<artifact th:text="${genproject.fullartifact.resolvedGroupId}+':'+${genproject.fullartifact.project.artifactId}">jp.co.iidev:JavaLib</artifact>
+									<includes th:remove="all-but-first">
+										<include th:each="inccls : ${genproject.includeclasses}" th:text="${inccls.resourcePath}">jp/co/iidev/algos/exceptions/IIDAssumptionViolation.class</include>
+										<include>jp/co/iidev/algos/exceptions/Cls2.class</include>
+									</includes>
+								</filter>
+							</filters>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+	<dependencies>
+		<dependency th:with="a=${genproject.fullartifact.project},b=${genproject.fullartifact}" >
+			<groupId th:if="${b.resolvedGroupId}"  th:text="${b.resolvedGroupId}">com.google.guava</groupId>
+			<artifactId th:if="${a.artifactId}" th:text="${a.artifactId}">guava</artifactId>
+			<scope>compile</scope>
+			<classifier th:if="${b.resolvedClassifier}" th:text="${b.resolvedClassifier}">jar</classifier>
+			<version th:if="${a.version}" th:text="${a.version}">0.0.1</version>
+		</dependency>
+		<dependency th:each="a : ${genproject.project.dependencies}" >
+			<groupId th:if="${a.groupId}"  th:text="${a.groupId}">com.google.guava</groupId>
+			<artifactId th:if="${a.artifactId}" th:text="${a.artifactId}">guava</artifactId>
+			<scope th:if="${a.scope}" th:text="${a.scope}">compile</scope>
+			<classifier th:if="${a.classifier}" th:text="${a.classifier}">hoge</classifier>
+			<version th:if="${a.version}" th:text="${a.version}">0.0.1</version>
+		</dependency>
+	</dependencies>
+	<parent th:if="${genproject.project.parent}" th:with="a=${genproject.project.parent}">
+		<groupId th:if="${a.groupId}"  th:text="${a.groupId}">jp.co.iidev</groupId>
+		<artifactId th:if="${a.artifactId}" th:text="${a.artifactId}">SuperMelon</artifactId>
+		<relativePath th:if="${a.relativePath}" th:text="${a.relativePath}">../../../../../</relativePath>
+		<version th:if="${a.version}" th:text="${a.version}">0.0.1-SNAPSHOT</version>
+	</parent>
+</project>
