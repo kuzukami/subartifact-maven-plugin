@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Dependency;
@@ -33,10 +34,12 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -52,10 +55,9 @@ import jp.co.iidev.subartifact1.divider1.PomSetGenerator;
 /**
  * Goal which touches a timestamp file.
  *
- * @goal touch
  * 
  */
-@Mojo(name = "artifactdivider", defaultPhase = LifecyclePhase.INSTALL)
+@Mojo(name = "divide", defaultPhase = LifecyclePhase.INSTALL, requiresDependencyResolution= ResolutionScope.COMPILE)
 public class ArtifactDividerMojo extends AbstractMojo {
 	/**
 	 * Location of the file.
@@ -70,6 +72,9 @@ public class ArtifactDividerMojo extends AbstractMojo {
 	private MavenProject project;
 	
 
+	/**
+	 * The sub-artifacts definitions to be created from the main artifact.
+	 */
 	@Parameter
 	private SubArtifact[] subartifacts;
 
@@ -90,9 +95,9 @@ public class ArtifactDividerMojo extends AbstractMojo {
 				String clsf = dx.getClassifier();
 
 				for (Artifact art : arts) {
-					boolean a = art.getArtifactId().equals(artid);
-					boolean g = art.getGroupId().equals(grpid);
-					boolean c = art.getClassifier().equals(clsf);
+					boolean a = StringUtils.equals(art.getArtifactId(), artid);
+					boolean g = StringUtils.equals( art.getGroupId(), grpid);
+					boolean c =  StringUtils.equals( art.getClassifier(), clsf);
 
 					if (a && g && c) {
 						artifactsForDep.put(dx, art);

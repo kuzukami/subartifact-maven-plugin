@@ -21,5 +21,19 @@ public class SubArtifact implements SubArtifactDefinition {
 	public Dependency[] getExtraDependencies() {
 		return extraDependencies;
 	}
+	@Override
+	public String toString() {
+		return "SubArtifact [artifactId=" + artifactId + "]";
+	}
+	public void setArtifactId(String artifactId) {
+		this.artifactId = artifactId;
+	}
+	public void setRootClassAnnotations(Set<String> rootClassAnnotations) {
+		this.rootClassAnnotations = rootClassAnnotations;
+	}
+	public void setExtraDependencies(Dependency[] extraDependencies) {
+		this.extraDependencies = extraDependencies;
+	}
+	
 
 }

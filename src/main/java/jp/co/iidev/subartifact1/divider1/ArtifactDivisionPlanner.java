@@ -520,23 +520,23 @@ public class ArtifactDivisionPlanner implements Loggable{
 	 * 解くべき問題は、全ての遷移接続関係を破壊しないように、いずれか一つのAnchor流下に、全頂点を配置する問題。
 	 * Transitive Reduction問題の変種といえる。 https://en.wikipedia.org/wiki/Transitive_reduction
 	 * 
-	 * @param anchorFragments
+	 * @param outputArtifactFragments
 	 * @param adjacencyFun 
-	 * @param pseudoCommonAnchor 全てのAnchorFragmentの親に相当するモジュール。基本必ず必要。たとえば、Bootstrap JAR、全体共通クラス等がここに配置される。
+	 * @param dummyRootArtifact 全てのAnchorFragmentの親に相当するモジュール。基本必ず必要。たとえば、Bootstrap JAR、全体共通クラス等がここに配置される。
 	 * @param planAcceptor
 	 * @throws CyclicArtifact Artifactが循環している場合、この場合mavenでは依存関係を作成できない。
 	 * @throws AFPredicateInconsitency 指定した述語や、インターフェースの前提条件に適合していない場合
 	 */
 	public void main(
-				Set<? extends ArtifactFragment> anchorFragments,
+				Set<? extends ArtifactFragment> outputArtifactFragments,
 				Function<ArtifactFragment, Iterable<ArtifactFragment>> adjacencyFun,
-				ArtifactFragment pseudoCommonAnchor,
+				ArtifactFragment dummyRootArtifact,
 				PlanAcceptor planAcceptor
 				) throws CyclicArtifact, AFPredicateInconsitency {
 		main(
-				pseudoCommonAnchor,
-				anchorFragments,
-				Predicates.in(Sets.union(anchorFragments, Collections.singleton(pseudoCommonAnchor))),
+				dummyRootArtifact,
+				outputArtifactFragments,
+				Predicates.in(Sets.union(outputArtifactFragments, Collections.singleton(dummyRootArtifact))),
 				Predicates.instanceOf(ArtifactFragment.Artifact.class),
 				Predicates.instanceOf(ArtifactFragment.DebugContractable.class),
 				adjacencyFun,
@@ -546,7 +546,7 @@ public class ArtifactDivisionPlanner implements Loggable{
 	}
 	
 	public void main(
-			ArtifactFragment pseudoRootArtifact,
+			ArtifactFragment dummyRootArtifact,
 			Set<? extends ArtifactFragment> outputArtifactRootSet,
 			Predicate<? super ArtifactFragment> outputArtifactPred,
 			Predicate<? super ArtifactFragment> artifactPred,
@@ -557,7 +557,7 @@ public class ArtifactDivisionPlanner implements Loggable{
 		//check precondition of predicates
 		{
 			Set<? extends ArtifactFragment> roots =
-					Sets.union(outputArtifactRootSet, Collections.singleton(pseudoRootArtifact ));
+					Sets.union(outputArtifactRootSet, Collections.singleton(dummyRootArtifact ));
 
 			{
 				Set<? extends ArtifactFragment> output_artifact_but_not_artifact_pred = 
@@ -669,7 +669,7 @@ public class ArtifactDivisionPlanner implements Loggable{
 			Lists.newArrayList(artifactConnectedGraph.vertexSet()).stream()
 			.filter((x) -> outputArtifactPred.apply(x))
 			.forEach((vtx) -> {
-				Graphs.addEdgeWithVertices(tgtG,  vtx, pseudoRootArtifact);
+				Graphs.addEdgeWithVertices(tgtG,  vtx, dummyRootArtifact);
 			}) ;
 		}
 		
@@ -725,7 +725,7 @@ public class ArtifactDivisionPlanner implements Loggable{
 			//ある頂点(A)を流下に持つAnchor頂点群のうち、共通最高子孫(HCD)に頂点(A)を配置する。 DeploymentAnchor(A) = HCD(AnchorAncestors(A))
 			Function<Set<ArtifactFragment>,ArtifactFragment> highestCommonDescender_as_deployArtifactByAncestorArtifactsF =
 					(ascenders) -> {
-				return getHighestCommonDescender( artifactConnectedGraph, pseudoRootArtifact, ascenders);
+				return getHighestCommonDescender( artifactConnectedGraph, dummyRootArtifact, ascenders);
 			};
 			Map<Set<ArtifactFragment>, ArtifactFragment> cache_HCD = new ConcurrentHashMap<>();
 			
@@ -772,7 +772,7 @@ public class ArtifactDivisionPlanner implements Loggable{
 				
 				planAcceptor.reportAnchorDeploymentPlan( from , to
 						, () -> {
-							if ( to == pseudoRootArtifact )
+							if ( to == dummyRootArtifact )
 								return Lists.newArrayList();
 							
 							return dijkstraPath(

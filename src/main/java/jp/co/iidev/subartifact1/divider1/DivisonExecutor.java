@@ -45,6 +45,7 @@ import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ArtifactFragmen
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanAcceptor;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ReferenceInspector;
 import jp.co.iidev.subartifact1.divider1.DivisonExecutor.FluidClassPathUnit.FluidClass;
+import jp.co.iidev.subartifact1.divider1.mojo.SubArtifact;
 
 public class DivisonExecutor {
 	private static Logger log = LoggerFactory.getLogger(DivisonExecutor.class);
@@ -562,9 +563,21 @@ public class DivisonExecutor {
 				.transform(
 						(jm) -> SubArtifactRoot.forDetailTrace(jm,
 								pc.getKeepClazzes(jm.getRootClassAnnotations())))
-				.toList()
+				.copyInto(Lists.newArrayList())
 //				.toImmutableList()
 				;
+		
+		SubArtifactRoot dummyroot;
+		{
+			SubArtifact
+			dummyrt = new SubArtifact();
+			dummyrt.setArtifactId("**dummyroot**");
+			dummyrt.setExtraDependencies(new Dependency[0]);
+			dummyrt.setRootClassAnnotations(Sets.newHashSet());
+			
+			dummyroot = SubArtifactRoot.forDetailTrace(dummyrt, Sets.newHashSet());
+		}
+		
 		List<? extends DivisonExecutor.LibArtifact> libs =
 				jars.entrySet().stream()
 				.filter((f2clz) -> !mainjar.equals(f2clz.getKey()))
@@ -590,8 +603,8 @@ public class DivisonExecutor {
 				);
 		try (FullTracablePlanAcceptor pa = new FullTracablePlanAcceptor()) {
 			new ArtifactDivisionPlanner(lgf).main(
-					Sets.newHashSet(submoduleRoots.subList(1, submoduleRoots.size())),
-					adjacencyFunction(clzpath), submoduleRoots.get(0), pa);
+					Sets.<ArtifactFragment>newHashSet(submoduleRoots),
+					adjacencyFunction(clzpath), dummyroot, pa);
 			return pa.renderDeployments().stream()
 					.collect(
 							Collectors.toMap(
