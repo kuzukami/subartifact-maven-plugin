@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,10 +26,12 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 
+import javassist.bytecode.SignatureAttribute.ObjectType;
 import jp.co.iidev.subartifact1.api.SubArtifactDefinition;
 import jp.co.iidev.subartifact1.divider1.DivisonExecutor.SubArtifactDeployment;
 
@@ -175,6 +178,21 @@ public class PomSetGenerator {
 		
 	}
 	
+	static byte[] stdtempalte() throws IOException{
+		byte[] x= Resources.toByteArray(
+				Resources.getResource(
+						Joiner.on("/").join(
+								Iterables.concat(
+								ObjectTypeClassName
+								.forClass(PomSetGenerator.class)
+								.getPackageHierarchy()
+								,
+								Arrays.asList("template-pom.xml")
+								)
+								)
+						) );
+		return x;
+	}
 
 	public void generate(
 			String groupId, String version,
@@ -194,8 +212,7 @@ public class PomSetGenerator {
 			File tempatePomFile = new File( genDir, "template-pom.xml" );
 			if ( !tempatePomFile.exists() ){
 				//outtput default template
-				byte[] x= Resources.toByteArray( Resources.getResource("template-pom.xml") );
-				Files.write(x, tempatePomFile);
+				Files.write(stdtempalte(), tempatePomFile);
 			}
 			File genPomFile = new File( genDir, "pom.xml" );
 			
