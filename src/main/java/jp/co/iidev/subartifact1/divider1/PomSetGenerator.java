@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Ordering;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 
@@ -181,7 +183,8 @@ public class PomSetGenerator {
 			){
 		
 		List<ObjectTypeClassName> incclasses = 
-		FluentIterable.from( deploymentDescription.getDeployClassNames() )
+		FluentIterable.from(
+				Ordering.natural().sortedCopy( deploymentDescription.getDeployClassNames() ) )
 		.transform( ObjectTypeClassName::forClassName )
 //		.toImmutableList()
 		.toList()
