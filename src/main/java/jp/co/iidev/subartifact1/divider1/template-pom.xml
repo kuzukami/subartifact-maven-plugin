@@ -1,14 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+	<groupId th:if="${genproject.project.groupId}" th:text="${genproject.project.groupId}">jp.co.iidev</groupId>
 	<artifactId th:text="${genproject.project.artifactId}">javalib8-core</artifactId>
 	<name th:text="${genproject.project.name}">iidev javalib core</name>
-	<version th:text="${genproject.project.version}">0.0.1-SNAPSHOT</version>
+	<version th:if="${genproject.project.version}"  th:text="${genproject.project.version}">0.0.1-SNAPSHOT</version>
 	<packaging th:text="${genproject.project.packaging}">jar</packaging>
 	<properties>
-		<source.version>1.8</source.version>
+<!-- 		<source.version>1.8</source.version>
 		<target.version>1.8</target.version>
-		<encoding>UTF-8</encoding>
+		<source.encoding>UTF-8</source.encoding> -->
 	</properties>
 	<profiles>
 	</profiles>
@@ -20,13 +22,13 @@
 				<configuration>
 					<source>${source.version}</source>
 					<target>${target.version}</target>
-					<encoding>${encoding}</encoding>
+					<encoding>${source.encoding}</encoding>
 				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>2.4.1</version>
+<!-- 				<version>2.4.1</version> -->
 				<executions>
 					<execution>
 						<phase>package</phase>

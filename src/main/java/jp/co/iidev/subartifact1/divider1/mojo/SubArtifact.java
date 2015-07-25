@@ -11,6 +11,7 @@ public class SubArtifact implements SubArtifactDefinition {
 	private String artifactId;
     private Set<String> rootClassAnnotations;
     private Dependency[] extraDependencies;
+//    private boolean omittableIfEmpty;
     
 	public String getArtifactId() {
 		return artifactId;
@@ -34,6 +35,12 @@ public class SubArtifact implements SubArtifactDefinition {
 	public void setExtraDependencies(Dependency[] extraDependencies) {
 		this.extraDependencies = extraDependencies;
 	}
-	
+//	public boolean isOmittableIfEmpty() {
+//		return omittableIfEmpty;
+//	}
+//	public void setOmittableIfEmpty(boolean omitsIfEmpty) {
+//		this.omittableIfEmpty = omitsIfEmpty;
+//	}
+//	
 
 }

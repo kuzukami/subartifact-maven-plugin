@@ -1,5 +1,8 @@
 package jp.co.iidev.subartifact1.divider1.mojo;
 
+import static com.google.common.base.Predicates.in;
+import static com.google.common.base.Predicates.not;
+
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -38,15 +41,17 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.thymeleaf.standard.expression.DivisionExpression;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import jp.co.iidev.subartifact1.api.SubArtifactDefinition;
-import jp.co.iidev.subartifact1.divider1.DivisonExecutor;
-import jp.co.iidev.subartifact1.divider1.DivisonExecutor.SubArtifactDeployment;
+import jp.co.iidev.subartifact1.divider1.DivisionExecutor;
+import jp.co.iidev.subartifact1.divider1.DivisionExecutor.SubArtifactDeployment;
 import jp.co.iidev.subartifact1.divider1.Loggable;
 import jp.co.iidev.subartifact1.divider1.LoggableFactory;
 import jp.co.iidev.subartifact1.divider1.PomSetGenerator;
@@ -71,7 +76,19 @@ public class ArtifactDividerMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${project}", readonly = true, required = true)
 	private MavenProject project;
 	
-
+	/**
+	 * The root(=depending) sub-artifact's artifactId for every sub-artifacts newly created.
+	 */
+	@Parameter(defaultValue= "${project.artifactId}-root", property="divier.rootSubArtifactId", required = true )
+	private String rootSubArtifactId;
+	
+	/**
+	 * The parent pom artifact's artifactId to build every sub-artifacts including the root sub-subartifacts.
+	 */
+	@Parameter(defaultValue= "${project.artifactId}-subarts-parent", property="divier.subArtifactsParentArtifactId", required = true )
+	private String subArtifactsParentArtifactId;
+	
+	
 	/**
 	 * The sub-artifacts definitions to be created from the main artifact.
 	 */
@@ -110,7 +127,7 @@ public class ArtifactDividerMojo extends AbstractMojo {
 			String version = project.getVersion();
 			String groupId = project.getGroupId();
 
-			LinkedHashMap<File, Dependency> jar2dep = Maps.newLinkedHashMap();
+			LinkedHashMap<File, Dependency> compiletimeClasspath = Maps.newLinkedHashMap();
 
 			File rtjar = Paths
 					.get(System.getProperty("java.home"), "lib", "rt.jar")
@@ -132,50 +149,63 @@ public class ArtifactDividerMojo extends AbstractMojo {
 				targetJarDep.setClassifier(projArt.getClassifier());
 			}
 
-			jar2dep.put(rtjar, rtjar_dummyDep);
-			jar2dep.put(targetJar, targetJarDep);
+			compiletimeClasspath.put(rtjar, rtjar_dummyDep);
+			compiletimeClasspath.put(targetJar, targetJarDep);
 			artifactsForDep.forEach((d, a) -> {
-				jar2dep.put(a.getFile(), d);
+				compiletimeClasspath.put(a.getFile(), d);
 			});
+			
+			LoggableFactory lf = 
+			new LoggableFactory() {
+				@Override
+				public Loggable createLoggable(Class cx) {
+					return new Loggable() {
+						Logger l = LoggerFactory
+								.getLogger(cx);
 
+						@Override
+						public void warn(String text) {
+							l.warn(text);
+						}
+
+						@Override
+						public void info(String text) {
+							l.info(text);
+						}
+
+						@Override
+						public void error(String text) {
+							l.error(text);
+						}
+					};
+				}
+			};
 			try {
-				LinkedHashMap<SubArtifactDefinition, SubArtifactDeployment> plan = new DivisonExecutor()
-						.planDivision(targetJar,
-								Arrays.asList(subartifacts == null
-										? new SubArtifact[0] : subartifacts),
-								jar2dep, new LoggableFactory() {
-									@Override
-									public Loggable createLoggable(Class cx) {
-										return new Loggable() {
-											Logger l = LoggerFactory
-													.getLogger(cx);
+				LinkedHashMap<SubArtifactDefinition, SubArtifactDeployment>
+				buildPlan =
+						new DivisionExecutor(
+								lf.createLoggable(DivisionExecutor.class)
+						)
+						.planDivision(
+								targetJar
+								, rootSubArtifactId
+								, Arrays.asList(
+										subartifacts == null
+										? new SubArtifact[0] : subartifacts)
+								, compiletimeClasspath
+								, not(in(ImmutableSet.of( rtjar, targetJar )))
+								, lf
+								);
 
-											@Override
-											public void warn(String text) {
-												l.warn(text);
-											}
-
-											@Override
-											public void info(String text) {
-												l.info(text);
-											}
-
-											@Override
-											public void error(String text) {
-												l.error(text);
-											}
-										};
-									}
-								});
-
-				Set<File> usableJar = Sets.newLinkedHashSet(jar2dep.keySet());
+				Set<File> usableJar =
+						Sets.newLinkedHashSet(compiletimeClasspath.keySet());
 				usableJar.remove(targetJar);
 				usableJar.remove(rtjar);
 				
 				int ix = 0;
 				for ( SubArtifact s : subartifacts ){
 					for ( Dependency d : s.getExtraDependencies() ){
-						plan.get(s).getJarDeps().put(
+						buildPlan.get(s).getJarDeps().put(
 								new File("x_xx_xyx_duMmy" + (ix++) + ".jar")
 								, d);
 					}
@@ -183,7 +213,10 @@ public class ArtifactDividerMojo extends AbstractMojo {
 
 				new PomSetGenerator(Paths.get("pom.xml"),
 						Paths.get("target", "subartifacts")).generate(groupId,
-								version, plan, Predicates.in(usableJar));
+								version,
+								this.subArtifactsParentArtifactId,
+								buildPlan
+								);
 			} catch (RuntimeException e) {
 				throw e;
 			} catch (Exception e) {

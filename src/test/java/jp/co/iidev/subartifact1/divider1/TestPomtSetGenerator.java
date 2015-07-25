@@ -15,6 +15,10 @@ public class TestPomtSetGenerator {
 		Assert.assertNotSame(
 				"template-pom.xml resource loading",
 				0, PomSetGenerator.stdtempalte().length );
+		
+		Assert.assertNotSame(
+				"template-parent-pom.xml resource loading",
+				0, PomSetGenerator.stdparenttempalte().length );
 	}
 
 }

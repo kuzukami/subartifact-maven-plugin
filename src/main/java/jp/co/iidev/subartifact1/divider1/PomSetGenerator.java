@@ -27,21 +27,21 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 
-import javassist.bytecode.SignatureAttribute.ObjectType;
 import jp.co.iidev.subartifact1.api.SubArtifactDefinition;
-import jp.co.iidev.subartifact1.divider1.DivisonExecutor.SubArtifactDeployment;
+import jp.co.iidev.subartifact1.divider1.DivisionExecutor.SubArtifactDeployment;
 
 public class PomSetGenerator {
-	final Path fullArtifactPomRelative;
+	final Path fullArtifactPomRelativeByNewProjectDir;
 	final Path pomSetGenerationDir;
 
 	public PomSetGenerator(Path fullArtifactPom, Path pomSetGenerationDir) {
 		this.pomSetGenerationDir = pomSetGenerationDir;
-		this.fullArtifactPomRelative = pomSetGenerationDir
+		this.fullArtifactPomRelativeByNewProjectDir = pomSetGenerationDir
 				.resolve("tesueito")//once deeper 
 				.relativize(fullArtifactPom);
 	}
@@ -127,35 +127,28 @@ public class PomSetGenerator {
 //		
 //	}
 	
-	private static GenProject buildValueModel(
-			String groupId, String version,
-			SubArtifactDeployment deploymentDescription,
+	private static GenProject buildParentOfSubartifacts(
+			String groupId, String version, String artifactId,
+			LinkedHashMap<SubArtifactDefinition, DivisionExecutor.SubArtifactDeployment> generatesBySequence,
 			Path fullArtifactPomRelative,
-			Model fullArtfactMainPOM,
-			Predicate<File> usableJAR
+			Model fullArtfactMainPOM
 			){
 		
 		List<ObjectTypeClassName> incclasses = 
-		FluentIterable.from( deploymentDescription.getDeployClassNames() )
-		.transform( ObjectTypeClassName::forClassName )
-//		.toImmutableList()
-		.toList()
+				Lists.newArrayList();
 		;
 		
 		Model m = new Model();
 		
-		m.setArtifactId(deploymentDescription.getTarget().getArtifactId());
+		m.setArtifactId(artifactId);
 		m.setGroupId(groupId);
 		m.setVersion(version);
-		m.setPackaging("jar");
-		m.setName(deploymentDescription.getTarget().toString());
+		m.setPackaging("pom");
+		m.setName("Subartifact Root Project for " + fullArtfactMainPOM.getArtifactId() );
 		
-		for ( Map.Entry<File,Dependency> jar :
-				Maps.filterKeys( deploymentDescription.getJarDeps(), usableJAR )
-				.entrySet() ){
-			Dependency d = jar.getValue();;
-//			if ( d != null )
-			m.addDependency( d );
+		for ( Map.Entry<SubArtifactDefinition,SubArtifactDeployment> subart :
+				generatesBySequence.entrySet() ){
+			m.getModules().add( "../" + subart.getKey().getArtifactId());// artifact id foldername
 		}
 		
 		Parent p;
@@ -178,7 +171,72 @@ public class PomSetGenerator {
 		
 	}
 	
+	private static GenProject buildSubartifact(
+			String groupId, String version,
+			SubArtifactDeployment deploymentDescription,
+			Path parentPomRelative,
+			Model parentPom,
+			Model fullArtifactPom
+//			, Predicate<File> usableJAR
+			){
+		
+		List<ObjectTypeClassName> incclasses = 
+		FluentIterable.from( deploymentDescription.getDeployClassNames() )
+		.transform( ObjectTypeClassName::forClassName )
+//		.toImmutableList()
+		.toList()
+		;
+		
+		Model m = new Model();
+		
+		m.setArtifactId(deploymentDescription.getTarget().getArtifactId());
+		m.setGroupId(groupId);
+		m.setVersion(version);
+		m.setPackaging("jar");
+		m.setName(deploymentDescription.getTarget().toString());
+		
+		for ( Map.Entry<File,Dependency> jar :
+				deploymentDescription.getJarDeps().entrySet() ){
+			Dependency d = jar.getValue();;
+//			if ( d != null )
+			m.addDependency( d );
+		}
+		
+		for ( SubArtifactDefinition sa :
+			deploymentDescription.getSubartDeps()
+			){
+			Dependency d = new Dependency();
+			d.setArtifactId( sa.getArtifactId() );
+			d.setGroupId(groupId);
+			d.setVersion(version);
+			//		if ( d != null )
+			m.addDependency( d );
+		}
+		
+		Parent p;
+		{
+			p = new Parent();
+			p.setVersion( parentPom.getVersion() );
+			p.setGroupId( parentPom.getGroupId() );
+			p.setArtifactId( parentPom.getArtifactId() );
+			p.setRelativePath( Joiner.on("/").join( parentPomRelative ) );
+		}
+		m.setParent( p );
+		
+		
+		return new GenProject(m, incclasses, new GenProject.FullArtifact(fullArtifactPom, null, groupId));
+		
+	}
+	
 	static byte[] stdtempalte() throws IOException{
+		return resource("template-pom.xml");
+	}
+	
+	static byte[] stdparenttempalte() throws IOException{
+		return resource("template-parent-pom.xml");
+	}
+	
+	static byte[] resource(String resource) throws IOException{
 		byte[] x= Resources.toByteArray(
 				Resources.getResource(
 						Joiner.on("/").join(
@@ -187,7 +245,7 @@ public class PomSetGenerator {
 								.forClass(PomSetGenerator.class)
 								.getPackageHierarchy()
 								,
-								Arrays.asList("template-pom.xml")
+								Arrays.asList(resource)
 								)
 								)
 						) );
@@ -195,19 +253,52 @@ public class PomSetGenerator {
 	}
 
 	public void generate(
-			String groupId, String version,
-			LinkedHashMap<SubArtifactDefinition, DivisonExecutor.SubArtifactDeployment> generatesBySequence
-			, Predicate<File> usableJARs
+			String groupId, String version, String subartsParentArtifactId,
+			LinkedHashMap<SubArtifactDefinition, DivisionExecutor.SubArtifactDeployment> generatesBySequence
 			) throws IOException, XmlPullParserException {
-		for (Map.Entry<SubArtifactDefinition, DivisonExecutor.SubArtifactDeployment> me : generatesBySequence
+		
+		Path parentPomDir = pomSetGenerationDir.resolve(subartsParentArtifactId);
+		File fullArtifactPomFile = parentPomDir.resolve( fullArtifactPomRelativeByNewProjectDir ) .toFile();
+		File parentPomGenerated;
+		
+		{
+			//generate parent pom for every subartifact
+			File genDir = parentPomDir.toFile();
+			genDir.mkdirs();
+			File tempatePomFile = new File( genDir, "template-parent-pom.xml" );
+			if ( !tempatePomFile.exists() ){
+				//outtput default template
+				Files.write(stdparenttempalte(), tempatePomFile);
+			}
+			File genPomFile = new File( genDir, "pom.xml" );
+			parentPomGenerated = genPomFile;
+			
+			Model fullPom = new MavenXpp3Reader().read(new FileInputStream(fullArtifactPomFile));
+			
+			GenProject ge =
+			buildParentOfSubartifacts(
+					groupId, version, subartsParentArtifactId, generatesBySequence
+					, fullArtifactPomRelativeByNewProjectDir
+					, fullPom);
+			
+			String renderedXML = Thymeleafs.start()
+					.add("genproject", ge)
+					.render(tempatePomFile);
+			Files.write(renderedXML, genPomFile, Charsets.UTF_8);
+		}
+		
+		
+		
+		//generate each subartifact
+		for (Map.Entry<SubArtifactDefinition, DivisionExecutor.SubArtifactDeployment> me : generatesBySequence
 				.entrySet()) {
 //			if ( me.getKey() != JavaLibSubModuleV2.core ) continue;
 			SubArtifactDefinition def = me.getKey();
 			SubArtifactDeployment dep = me.getValue();
 
 			String artid = def.getArtifactId();
-			Path pomPath = pomSetGenerationDir.resolve(artid);
-			File genDir = pomPath.toFile();
+			Path pomDir = pomSetGenerationDir.resolve(artid);
+			File genDir = pomDir.toFile();
 			genDir.mkdirs();
 			File tempatePomFile = new File( genDir, "template-pom.xml" );
 			if ( !tempatePomFile.exists() ){
@@ -216,16 +307,15 @@ public class PomSetGenerator {
 			}
 			File genPomFile = new File( genDir, "pom.xml" );
 			
-			File fullArtifactPomFile = pomPath.resolve( fullArtifactPomRelative ) .toFile();
+			Model parentPom = new MavenXpp3Reader().read(new FileInputStream(parentPomGenerated));
 			Model fullPom = new MavenXpp3Reader().read(new FileInputStream(fullArtifactPomFile));
-			
-			GenProject ge = buildValueModel(
+			GenProject ge = buildSubartifact(
 					groupId,
 					version,
 					dep
-					, fullArtifactPomRelative
+					, pomDir.relativize(parentPomDir)
+					, parentPom
 					, fullPom
-					, usableJARs
 					);
 
 			String renderedXML = Thymeleafs.start()
@@ -281,21 +371,21 @@ public class PomSetGenerator {
 				return this;
 			}
 
-			public RuntimeEnvironment addIfNotNull(String variable,
-					Object env) {
-				if (env != null)
-					add(variable, env);
-				return this;
-			}
-
-			public RuntimeEnvironment addArtifact(String prefix,
-					Dependency dep) {
-				return add(prefix + ".groupId", dep.getGroupId())
-						.add(prefix + ".artifactId", dep.getArtifactId())
-						.add(prefix + ".version", dep.getVersion())
-						.add(prefix + ".scope", dep.getScope())
-						.add(prefix + ".classifier", dep.getClassifier());
-			}
+//			public RuntimeEnvironment addIfNotNull(String variable,
+//					Object env) {
+//				if (env != null)
+//					add(variable, env);
+//				return this;
+//			}
+//
+//			public RuntimeEnvironment addArtifact(String prefix,
+//					Dependency dep) {
+//				return add(prefix + ".groupId", dep.getGroupId())
+//						.add(prefix + ".artifactId", dep.getArtifactId())
+//						.add(prefix + ".version", dep.getVersion())
+//						.add(prefix + ".scope", dep.getScope())
+//						.add(prefix + ".classifier", dep.getClassifier());
+//			}
 
 			<C extends AbstractContext> C initializeContext(C web) {
 				for (Map.Entry<String, Object> m : environmentBase.entrySet())

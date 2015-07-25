@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId th:if="${genproject.project.groupId}" th:text="${genproject.project.groupId}">jp.co.iidev</groupId>
+	<artifactId th:text="${genproject.project.artifactId}">javalib8-core</artifactId>
+	<name th:text="${genproject.project.name}">iidev javalib core</name>
+	<version th:if="${genproject.project.version}" th:text="${genproject.project.version}">0.0.1-SNAPSHOT</version>
+	<packaging th:text="${genproject.project.packaging}">jar</packaging>
+	<properties>
+		<source.version>1.8</source.version>
+		<target.version>1.8</target.version>
+		<encoding>UTF-8</encoding>
+	</properties>
+	<profiles>
+	</profiles>
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.3</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-shade-plugin</artifactId>
+					<version>2.4.1</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+	<dependencyManagement>
+	</dependencyManagement>
+	<modules th:if="${genproject.project.modules.isEmpty() == false}"
+		th:remove="all-but-first">
+		<module th:each="md : ${genproject.project.modules}" th:text="${md}">../maven-hacks</module>
+		<module>../WaterMelon/JavaLib</module>
+		<module>../WaterMelon-jar</module>
+	</modules>
+	<parent th:if="${genproject.project.parent}" th:with="a=${genproject.project.parent}">
+		<groupId th:if="${a.groupId}" th:text="${a.groupId}">jp.co.iidev</groupId>
+		<artifactId th:if="${a.artifactId}" th:text="${a.artifactId}">SuperMelon</artifactId>
+		<relativePath th:if="${a.relativePath}" th:text="${a.relativePath}">../../../../../</relativePath>
+		<version th:if="${a.version}" th:text="${a.version}">0.0.1-SNAPSHOT</version>
+	</parent>
+</project>
