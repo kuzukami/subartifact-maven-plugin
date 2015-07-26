@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +24,6 @@ import org.thymeleaf.templateresolver.FileTemplateResolver;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
-import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -40,9 +38,11 @@ import jp.co.iidev.subartifact1.divider1.DivisionExecutor.SubArtifactDeployment;
 public class PomSetGenerator {
 	final Path fullArtifactPomRelativeByNewProjectDir;
 	final Path pomSetGenerationDir;
+	final Path templatePomSetGenerationDir;
 
-	public PomSetGenerator(Path fullArtifactPom, Path pomSetGenerationDir) {
+	public PomSetGenerator(Path fullArtifactPom, Path pomSetGenerationDir, Path templatePomSetGenerationDir) {
 		this.pomSetGenerationDir = pomSetGenerationDir;
+		this.templatePomSetGenerationDir = templatePomSetGenerationDir;
 		this.fullArtifactPomRelativeByNewProjectDir = pomSetGenerationDir
 				.resolve("tesueito")//once deeper 
 				.relativize(fullArtifactPom);
@@ -98,7 +98,6 @@ public class PomSetGenerator {
 				this.resolvedClassifier = classifier;
 				this.resolvedGroupId = groupId;
 			}
-
 
 		}
 	}
@@ -254,27 +253,71 @@ public class PomSetGenerator {
 						) );
 		return x;
 	}
+	private  class PomSetup{
+		private final Path pomDir, templatePomDir;
+		private final File pomFileGenerated, templatePomFileNowExists;
+		protected PomSetup(Path pomDir, Path templatePomDir, File pomFile,
+				File templatePomFile) {
+			super();
+			this.pomDir = pomDir;
+			this.templatePomDir = templatePomDir;
+			this.pomFileGenerated = pomFile;
+			this.templatePomFileNowExists = templatePomFile;
+		}
+		
+	}
+	
+	private PomSetup initializePOM(
+			String subartifactId
+			,
+			String templatename
+			,
+			byte[] tempalteByte
+			)throws IOException{
+		Path parentPomDir = pomSetGenerationDir.resolve(subartifactId);
+		Path tempalteParentPomDir = templatePomSetGenerationDir.resolve(subartifactId);
+		
+		File genDir = parentPomDir.toFile();
+		genDir.mkdirs();
+		
+		
+		File tempalteDir = tempalteParentPomDir.toFile();
+		tempalteDir.mkdirs();
+		
+		File tempatePomFile = new File( tempalteDir, templatename);// "template-parent-pom.xml" );
+		if ( !tempatePomFile.exists() ){
+			//outtput default template
+			Files.write(tempalteByte, tempatePomFile);
+		}
+		
+		return new PomSetup( parentPomDir, tempalteParentPomDir, new File( genDir, "pom.xml" ), tempatePomFile );
+	}
 
 	public void generate(
 			String groupId, String version, String subartsParentArtifactId,
 			LinkedHashMap<SubArtifactDefinition, DivisionExecutor.SubArtifactDeployment> generatesBySequence
 			) throws IOException, XmlPullParserException {
 		
+		
 		Path parentPomDir = pomSetGenerationDir.resolve(subartsParentArtifactId);
 		File fullArtifactPomFile = parentPomDir.resolve( fullArtifactPomRelativeByNewProjectDir ) .toFile();
 		File parentPomGenerated;
 		
 		{
-			//generate parent pom for every subartifact
-			File genDir = parentPomDir.toFile();
-			genDir.mkdirs();
-			File tempatePomFile = new File( genDir, "template-parent-pom.xml" );
-			if ( !tempatePomFile.exists() ){
-				//outtput default template
-				Files.write(stdparenttempalte(), tempatePomFile);
-			}
-			File genPomFile = new File( genDir, "pom.xml" );
-			parentPomGenerated = genPomFile;
+			//generate parent pom to build every subartifact
+			PomSetup p =
+					initializePOM(subartsParentArtifactId,
+					"template-parent-pom.xml",
+					stdparenttempalte());
+//			File genDir = parentPomDir.toFile();
+//			genDir.mkdirs();
+//			File tempatePomFile = new File( genDir, "template-parent-pom.xml" );
+//			if ( !tempatePomFile.exists() ){
+//				//outtput default template
+//				Files.write(stdparenttempalte(), tempatePomFile);
+//			}
+//			File genPomFile = new File( genDir, "pom.xml" );
+//			parentPomGenerated = genPomFile;
 			
 			Model fullPom = new MavenXpp3Reader().read(new FileInputStream(fullArtifactPomFile));
 			
@@ -286,8 +329,9 @@ public class PomSetGenerator {
 			
 			String renderedXML = Thymeleafs.start()
 					.add("genproject", ge)
-					.render(tempatePomFile);
-			Files.write(renderedXML, genPomFile, Charsets.UTF_8);
+					.render(p.templatePomFileNowExists);
+			Files.write(renderedXML, p.pomFileGenerated, Charsets.UTF_8);
+			parentPomGenerated = p.pomFileGenerated; 
 		}
 		
 		
@@ -300,15 +344,21 @@ public class PomSetGenerator {
 			SubArtifactDeployment dep = me.getValue();
 
 			String artid = def.getArtifactId();
-			Path pomDir = pomSetGenerationDir.resolve(artid);
-			File genDir = pomDir.toFile();
-			genDir.mkdirs();
-			File tempatePomFile = new File( genDir, "template-pom.xml" );
-			if ( !tempatePomFile.exists() ){
-				//outtput default template
-				Files.write(stdtempalte(), tempatePomFile);
-			}
-			File genPomFile = new File( genDir, "pom.xml" );
+			
+			PomSetup p =
+					initializePOM(artid,
+					"template-pom.xml",
+					stdtempalte());
+			
+//			Path pomDir = pomSetGenerationDir.resolve(artid);
+//			File genDir = pomDir.toFile();
+//			genDir.mkdirs();
+//			File tempatePomFile = new File( genDir, "template-pom.xml" );
+//			if ( !tempatePomFile.exists() ){
+//				//outtput default template
+//				Files.write(stdtempalte(), tempatePomFile);
+//			}
+//			File genPomFile = new File( genDir, "pom.xml" );
 			
 			Model parentPom = new MavenXpp3Reader().read(new FileInputStream(parentPomGenerated));
 			Model fullPom = new MavenXpp3Reader().read(new FileInputStream(fullArtifactPomFile));
@@ -316,15 +366,15 @@ public class PomSetGenerator {
 					groupId,
 					version,
 					dep
-					, pomDir.relativize(parentPomDir)
+					, p.pomDir.relativize(parentPomDir)
 					, parentPom
 					, fullPom
 					);
 
 			String renderedXML = Thymeleafs.start()
 					.add("genproject", ge)
-					.render(tempatePomFile);
-			Files.write(renderedXML, genPomFile, Charsets.UTF_8);
+					.render(p.templatePomFileNowExists);
+			Files.write(renderedXML, p.pomFileGenerated, Charsets.UTF_8);
 		}
 	}
 

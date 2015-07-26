@@ -53,7 +53,7 @@ public class DivisionExecutor {
 	private final Loggable log;
 
 	private void info(String msg, Object... names) {
-		log.error(msg, names);
+		log.info(msg, names);
 	}
 
 	private void error(String msg, Object... names) {
@@ -153,14 +153,26 @@ public class DivisionExecutor {
 			Iterable<? extends ArtifactFragment> ia = Lists.newArrayList();
 			if (a instanceof DivisionExecutor.ClazzSet) {
 				DivisionExecutor.ClazzSet czs = (DivisionExecutor.ClazzSet) a;
-				ia = resolve(czs.getDepends()).values();
+				ia = resolve(czs.getDepends(),
+						(clz) -> {
+							List<String> k = Lists.newArrayList();
+							for ( Clazz refc : czs.myclazzes ){
+								if ( refc.getDependencies().contains(clz) ){
+									k.add( refc.getName() );
+							}}
+							return k;
+						} ).values();
 			}
 
 			return Sets.newHashSet(
 					Iterables.concat(extractAdjacent.get(a), ia));
 		}
 
-		public Map<Clazz, DivisionExecutor.ClazzSet> resolve(Set<Clazz> resolveRequiredO) {
+		private Map<Clazz, DivisionExecutor.ClazzSet> resolve(
+				Set<Clazz> resolveRequiredO
+				,
+				Function<Clazz, List<String>> inverseReferencerLookupF
+				) {
 			{
 				// cache operation
 				Set<Clazz> resolveRequired = resolveRequiredO;
@@ -177,8 +189,13 @@ public class DivisionExecutor {
 				}
 
 				if (!resolveRequired.isEmpty())
-					error("There are unknown classes: {}",
-							Joiner.on(", ").join(resolveRequired));
+					for ( Clazz unknownClz : resolveRequired ) {
+						error("There is an unknown class {} in ( {} )",
+								unknownClz.getName()
+								,
+								Joiner.on(", ").join(inverseReferencerLookupF.apply(unknownClz))
+								);
+					}
 			}
 
 			Map<Clazz, DivisionExecutor.ClazzSet> s = Maps.newHashMap();

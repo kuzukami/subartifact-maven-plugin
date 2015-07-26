@@ -64,12 +64,19 @@ import jp.co.iidev.subartifact1.divider1.PomSetGenerator;
  */
 @Mojo(name = "divide", defaultPhase = LifecyclePhase.INSTALL, requiresDependencyResolution= ResolutionScope.COMPILE)
 public class ArtifactDividerMojo extends AbstractMojo {
+	
 	/**
-	 * Location of the file.
+	 * Location of the parent directory of pom output directory.
 	 */
-	@Parameter(defaultValue = "${project.build.directory}", property = "outputDir", required = true)
+	@Parameter(defaultValue = "${basedir}/target/subartifacts", property = "diriver.outputDir", required = true)
 	private File outputDirectory;
 
+	/**
+	 * Location of the parent directory of template-pom.xml or template-parent-pom.xml output directory.
+	 */
+	@Parameter(defaultValue = "${basedir}/subartifact-templates", property = "diriver.outputDir", required = true)
+	private File templateOutputDirectory;
+	
 	/**
 	 * The current Maven project.
 	 */
@@ -83,7 +90,7 @@ public class ArtifactDividerMojo extends AbstractMojo {
 	private String rootSubArtifactId;
 	
 	/**
-	 * The parent pom artifact's artifactId to build every sub-artifacts including the root sub-subartifacts.
+	 * The parent pom artifactId to build every sub-artifact including the root sub-artifact.
 	 */
 	@Parameter(defaultValue= "${project.artifactId}-subarts-parent", property="divier.subArtifactsParentArtifactId", required = true )
 	private String subArtifactsParentArtifactId;
@@ -211,8 +218,11 @@ public class ArtifactDividerMojo extends AbstractMojo {
 					}
 				}
 
-				new PomSetGenerator(Paths.get("pom.xml"),
-						Paths.get("target", "subartifacts")).generate(groupId,
+				new PomSetGenerator(
+						project.getBasedir().toPath().resolve("pom.xml"),
+						outputDirectory.toPath(),
+						templateOutputDirectory.toPath()
+						).generate(groupId,
 								version,
 								this.subArtifactsParentArtifactId,
 								buildPlan
