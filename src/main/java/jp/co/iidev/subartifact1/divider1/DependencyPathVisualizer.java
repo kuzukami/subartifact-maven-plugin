@@ -23,7 +23,7 @@ public class DependencyPathVisualizer {
 		return StringUtils.repeat(tabPad, tabindex);
 	}
 	
-	static List<String> visualizeReversedDepedencyPathWithoutHead(
+	static List<String> visualizeReversedDepedencyPath(
 			List<ArtifactFragment> dependingPathIncludingEnd /*size() >= 1 */,
 			List<ArtifactFragment> dependedPathFromStartOfDependingPath /* size() >= 1*/
 			, int tabIndent ){

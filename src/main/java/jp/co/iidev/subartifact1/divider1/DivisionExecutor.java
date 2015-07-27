@@ -758,7 +758,7 @@ public class DivisionExecutor {
 					
 					
 					List<String> pathvis = 
-					DependencyPathVisualizer.visualizeReversedDepedencyPathWithoutHead(
+					DependencyPathVisualizer.visualizeReversedDepedencyPath(
 							dependingDirGraphFromDirectArt
 							, dependedDirGraphFromDeployToDirectArtifacts
 							, tabIndent -1);

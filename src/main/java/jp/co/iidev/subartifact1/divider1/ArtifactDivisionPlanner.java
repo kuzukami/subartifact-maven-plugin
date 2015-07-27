@@ -514,7 +514,7 @@ public class ArtifactDivisionPlanner implements Loggable {
 					for ( int artidx = 0; artidx < cycarts.size(); artidx ++ ){
 						ArtifactFragment af = cycarts.get(artidx);
 						List<String> cycpath_tonext = cycpaths_tonext.get(artidx);
-						logger.error("Cycle {}/{} Artifact{}/{}: {}", cycidx+1, cycles.size(), artidx+1, cycarts.size(), af.toString()  );
+						logger.error("Cycle {}/{} Artifact {}/{}: {}", cycidx+1, cycles.size(), artidx+1, cycarts.size(), af.toString()  );
 						cycpath_tonext.forEach( logger::error );
 					}
 				}
@@ -736,12 +736,15 @@ public class ArtifactDivisionPlanner implements Loggable {
 					ArtifactFragment now = cycle.get(0);
 					for (ArtifactFragment next_cycvertex : shift1tonext) {
 						List<String> vizpath =
-						DependencyPathVisualizer.visualizeReversedDepedencyPathWithoutHead(
+						DependencyPathVisualizer.visualizeReversedDepedencyPath(
+								Arrays.asList(now)
+								,
+								Lists.reverse(
 								dijkstraPath(detailFluidConnectedGraphForARoute(
 										fullGraphContainingDebug,
 										debugVerticesContraction_dst2contracted,
 										artifactPred, now, next_cycvertex), now, next_cycvertex)
-								, Arrays.asList(next_cycvertex)
+								)
 								, 0
 								);
 						
