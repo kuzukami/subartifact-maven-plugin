@@ -56,6 +56,10 @@ public class DivisionExecutor {
 		log.info(msg, names);
 	}
 
+	private void debug(String msg, Object... names) {
+		log.debug(msg, names);
+	}
+	
 	private void error(String msg, Object... names) {
 		log.error(msg, names);
 	}
@@ -190,11 +194,27 @@ public class DivisionExecutor {
 
 				if (!resolveRequired.isEmpty())
 					for ( Clazz unknownClz : resolveRequired ) {
-						error("There is an unknown class {} in ( {} )",
-								unknownClz.getName()
-								,
-								Joiner.on(", ").join(inverseReferencerLookupF.apply(unknownClz))
-								);
+						//http://stackoverflow.com/questions/18769282/does-anyone-have-background-on-the-java-annotation-java-lang-synthetic
+						if ( "java.lang.Synthetic".equals( unknownClz.getName() ) ){
+							//see org/objectweb/asm/ClassReader.java 
+						    // workaround for a bug in javac (javac compiler generates a parameter
+						    // annotation array whose size is equal to the number of parameters in
+						    // the Java source file, while it should generate an array whose size is
+						    // equal to the number of parameters in the method descriptor - which
+						    // includes the synthetic parameters added by the compiler). This work-
+						    // around supposes that the synthetic parameters are the first ones.
+							debug("{} is found in ( {} )",
+									unknownClz.getName()
+									,
+									Joiner.on(", ").join(inverseReferencerLookupF.apply(unknownClz))
+									);
+						}else{
+							error("There is an unknown class {} in ( {} )",
+									unknownClz.getName()
+									,
+									Joiner.on(", ").join(inverseReferencerLookupF.apply(unknownClz))
+									);
+						}
 					}
 			}
 

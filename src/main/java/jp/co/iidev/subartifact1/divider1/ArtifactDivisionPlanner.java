@@ -69,6 +69,11 @@ public class ArtifactDivisionPlanner implements Loggable {
 		logger.error(text);
 	}
 
+	@Override
+	public void debug(String text) {
+		logger.debug(text);
+	}
+
 	protected ArtifactDivisionPlanner(LoggableFactory lf) {
 		super();
 		this.logger = lf.createLoggable(ArtifactDivisionPlanner.class);

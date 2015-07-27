@@ -184,6 +184,11 @@ public class ArtifactDividerMojo extends AbstractMojo {
 						public void error(String text) {
 							l.error(text);
 						}
+
+						@Override
+						public void debug(String text) {
+							l.debug(text);
+						}
 					};
 				}
 			};
