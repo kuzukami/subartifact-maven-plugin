@@ -11,15 +11,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.maven.artifact.factory.ArtifactFactory;
 import org.apache.maven.model.Dependency;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.vafer.jdependency.Clazz;
 import org.vafer.jdependency.Clazzpath;
 import org.vafer.jdependency.ClazzpathUnit;
@@ -45,6 +41,8 @@ import javassist.NotFoundException;
 import jp.co.iidev.subartifact1.api.SubArtifactDefinition;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ArtifactFragment;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanAcceptor;
+import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.AFPredicateInconsitency;
+import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.CyclicArtifact;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ReferenceInspector;
 import jp.co.iidev.subartifact1.divider1.DivisionExecutor.RelocatableClassPathUnit.RelocatableClass;
 import jp.co.iidev.subartifact1.divider1.mojo.SubArtifact;
@@ -585,7 +583,7 @@ public class DivisionExecutor {
 			LinkedHashMap<File, Dependency> compiletimeClasspath,
 			Predicate<File> outputClasspathAliveFilter,
 			LoggableFactory lgf
-			) throws Exception {
+			) throws CyclicArtifact, NotFoundException, AFPredicateInconsitency{
 		ClassPool loader = new ClassPool(false);
 		for (File jf : compiletimeClasspath.keySet())
 			loader.appendClassPath(jf.getAbsolutePath());
@@ -676,6 +674,12 @@ public class DivisionExecutor {
 									}
 									, LinkedHashMap::new
 									));
+		} catch (CyclicArtifact e) {
+			e.logReasonAsError(log);
+			throw e;
+		} catch (AFPredicateInconsitency e) {
+			e.logReasonAsError(log);
+			throw e;
 		}
 	}
 
@@ -746,36 +750,23 @@ public class DivisionExecutor {
 			List<String> getReason(int tabIndent) {
 				List<String> k = Lists.newArrayList();
 				for (ReferenceInspector riByDirectDependingArtifact : forEachDirectDependingArtifact) {
-					int i = tabIndent;
-					{
-						List<ArtifactFragment> dependingDirGraphFromDirectArt = riByDirectDependingArtifact
-								.computeDependingShortestPathFromDirectlyDependingArtifactToRelocatableFrament();
-						Collections.reverse(dependingDirGraphFromDirectArt);
-
-						for (ArtifactFragment af : Iterables
-								.skip(dependingDirGraphFromDirectArt, 1)) {
-							k.add(StringsIID
-									.replaceTemplateAsSLF4J("{}{}{}",
-											StringUtils.repeat(tabPad,
-													i),
-											"<=", af.toString()));
-							i++;
-						}
-					}
+					List<ArtifactFragment> dependingDirGraphFromDirectArt = riByDirectDependingArtifact
+							.computeDependingShortestPathFromDirectlyDependingArtifactToRelocatableFrament();
 					
-					{
-						List<ArtifactFragment> dependedDirGraphFromDeployToDirectArtifacts = riByDirectDependingArtifact
-								.computeDependedShortestPathFromLocatedToDirectlyDependingArtifact();
-						Collections.reverse(dependedDirGraphFromDeployToDirectArtifacts);
-						for (ArtifactFragment af : Iterables
-								.skip(dependedDirGraphFromDeployToDirectArtifacts, 1)) {
-							k.add(StringsIID.replaceTemplateAsSLF4J(
-									"{}=>{}",
-									StringUtils.repeat(tabPad, i),
-									af.toString()));
-							i++;
-						}
-					}
+					List<ArtifactFragment> dependedDirGraphFromDeployToDirectArtifacts = riByDirectDependingArtifact
+							.computeDependedShortestPathFromLocatedToDirectlyDependingArtifact();
+					
+					
+					List<String> pathvis = 
+					DependencyPathVisualizer.visualizeReversedDepedencyPathWithoutHead(
+							dependingDirGraphFromDirectArt
+							, dependedDirGraphFromDeployToDirectArtifacts
+							, tabIndent -1);
+					
+					Iterables.addAll(
+							k,
+							Iterables.skip(pathvis, 1)//skip me because already displayed.
+							);
 				}
 				return k;
 			}
@@ -879,10 +870,10 @@ public class DivisionExecutor {
 				for ( DeploymentUnit du : a.getValue() ){
 					ArtifactFragment tgt = du.deployeeFragment;
 					if ( !aliveFragments.apply(tgt) ){
-						info("{} is filterd out from {} because of the 'alive predicate' in plan", tgt, main );
+						info("{} is filterd out from {} because it's not passed for the 'alive predicate'.", tgt, main );
 					}else
 					if ( emptyOmitSet.contains(tgt) ){
-						info("{} is filterd out from {} because of the chain of 'empty omit' in plan", tgt, main );
+						info("{} is filterd out from {} because it's 'empty'.", tgt, main );
 					}else
 					if (tgt instanceof RelocatableClass) {
 						RelocatableClass fc = (RelocatableClass) tgt;
@@ -906,6 +897,7 @@ public class DivisionExecutor {
 				boolean fullEmpty = jardeps.isEmpty() && subart_deps.isEmpty() && deploy_classnames.isEmpty();
 				
 				if ( fullEmpty /* && main.submodule.isOmittableIfEmpty() */ ){
+					info("The artifact {} is not deployed because it's fully 'empty'.", main );
 					emptyOmitSet.add( main );
 				}else{
 					SubArtifactDeployment sa = new SubArtifactDeployment(
@@ -920,7 +912,7 @@ public class DivisionExecutor {
 		}
 	
 		@Override
-		public void close() throws Exception {
+		public void close(){
 			finalReport();
 			;
 		}

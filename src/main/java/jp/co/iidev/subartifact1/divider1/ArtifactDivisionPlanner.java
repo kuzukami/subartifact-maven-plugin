@@ -387,7 +387,7 @@ public class ArtifactDivisionPlanner implements Loggable {
 				List<ReferenceInspector> forEachDirectlyDependingArtifact);
 	}
 
-	protected static class PlanningException extends Exception {
+	public static abstract class PlanningException extends Exception {
 		protected PlanningException() {
 			super();
 		}
@@ -403,6 +403,8 @@ public class ArtifactDivisionPlanner implements Loggable {
 		protected PlanningException(Throwable cause) {
 			super(cause);
 		}
+		
+		public abstract void logReasonAsError( Loggable logger );
 
 		/**
 		 * 述語の前提条件がおかしい場合
@@ -455,6 +457,17 @@ public class ArtifactDivisionPlanner implements Loggable {
 						+ ", inconsitentSets=" + inconsitentSets + "]";
 			}
 
+			@Override
+			public void logReasonAsError(Loggable logger) {
+				int cnt =  inconsitentSets.size();
+				logger.error( "Wrong Library Usage? The {} artifacts below are inconsitent with the predicate of '{}'.", cnt, type.name() );
+				int i = 1;
+				for ( ArtifactFragment af : inconsitentSets ){
+					logger.error( "INCONSITENT ARTIFACT {}/{}: {}", i, cnt,  af.toString() );
+					i ++;
+				}
+			}
+
 		}
 
 		/**
@@ -464,37 +477,47 @@ public class ArtifactDivisionPlanner implements Loggable {
 		 */
 		public static class CyclicArtifact extends PlanningException {
 			private final List<List<ArtifactFragment>> cycles;
+			private final List<List<List<String>>> dependingPathToNextArtifactFragment;
 
-			protected CyclicArtifact(List<List<ArtifactFragment>> cycles) {
+			protected CyclicArtifact(List<List<ArtifactFragment>> cycles,
+					List<List<List<String>>> dependencyPathOfCycleEdge	
+					) {
 				super();
 				this.cycles = cycles;
+				this.dependingPathToNextArtifactFragment = dependencyPathOfCycleEdge;
 			}
 
-			protected CyclicArtifact(List<List<ArtifactFragment>> cycles,
-					String message, Throwable cause) {
-				super(message, cause);
-				this.cycles = cycles;
-			}
-
-			protected CyclicArtifact(List<List<ArtifactFragment>> cycles,
-					String message) {
-				super(message);
-				this.cycles = cycles;
-			}
-
-			protected CyclicArtifact(List<List<ArtifactFragment>> cycles,
-					Throwable cause) {
-				super(cause);
-				this.cycles = cycles;
-			}
 
 			public List<List<ArtifactFragment>> getCycles() {
 				return cycles;
 			}
 
+			List<List<List<String>>> getDependingPathToNextArtifactFragment() {
+				return dependingPathToNextArtifactFragment;
+			}
+
+
 			@Override
 			public String toString() {
 				return "CyclicArtifact [cycles=" + cycles + "]";
+			}
+
+
+			@Override
+			public void logReasonAsError(Loggable logger) {
+				logger.error("Any deployment plan cannot be created because {} dependency cycles exist in the artifacts."
+						,  cycles.size());
+				for ( int cycidx = 0; cycidx < cycles.size(); cycidx ++ ){
+					List<ArtifactFragment> cycarts = cycles.get(cycidx);
+					List<List<String>> cycpaths_tonext = dependingPathToNextArtifactFragment.get(cycidx);
+					
+					for ( int artidx = 0; artidx < cycarts.size(); artidx ++ ){
+						ArtifactFragment af = cycarts.get(artidx);
+						List<String> cycpath_tonext = cycpaths_tonext.get(artidx);
+						logger.error("Cycle {}/{} Artifact{}/{}: {}", cycidx+1, cycles.size(), artidx+1, cycarts.size(), af.toString()  );
+						cycpath_tonext.forEach( logger::error );
+					}
+				}
 			}
 
 		}
@@ -700,14 +723,39 @@ public class ArtifactDivisionPlanner implements Loggable {
 					artifactConnectedGraph, (cycle) -> cycle);
 			if (artcycles.size() != 0) {
 				int i = 1;
-				for (List<ArtifactFragment> flg : artcycles) {
-					error("cycle {} :", (Integer) i);
-					for (ArtifactFragment ce : flg) {
-						error("  {} ", ce);
+				List<List<List<String>>> cycleEdgePath_toNext = Lists.newArrayList();
+				
+				for (List<ArtifactFragment> cycle : artcycles) {
+					List<ArtifactFragment> shift1tonext = 
+							Lists.newArrayList( Iterables.limit(
+											Iterables.skip( Iterables.cycle( cycle ) , 1 )
+											, cycle.size()));
+					
+					List<List<String>> cycleEdgePath_toNext_forThisCycle = Lists.newArrayList();
+					
+					ArtifactFragment now = cycle.get(0);
+					for (ArtifactFragment next_cycvertex : shift1tonext) {
+						List<String> vizpath =
+						DependencyPathVisualizer.visualizeReversedDepedencyPathWithoutHead(
+								dijkstraPath(detailFluidConnectedGraphForARoute(
+										fullGraphContainingDebug,
+										debugVerticesContraction_dst2contracted,
+										artifactPred, now, next_cycvertex), now, next_cycvertex)
+								, Arrays.asList(next_cycvertex)
+								, 0
+								);
+						
+						//report removing me
+						cycleEdgePath_toNext_forThisCycle.add(
+								Lists.newArrayList( Iterables.skip( vizpath, 1 ) ) );
+						
+						//update
+						now = next_cycvertex;
 					}
-					i++;
+					cycleEdgePath_toNext.add(cycleEdgePath_toNext_forThisCycle);
 				}
-				throw new CyclicArtifact(artcycles);
+				
+				throw new CyclicArtifact(artcycles, cycleEdgePath_toNext);
 			}
 		}
 
