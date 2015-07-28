@@ -20,7 +20,7 @@ public class DependencyPathVisualizer {
 	private static String tabPad = "  ";
 	
 	static String tab( String line, int tabindex ){
-		return StringUtils.repeat(tabPad, tabindex);
+		return StringUtils.repeat(tabPad, tabindex) + line;
 	}
 	
 	static List<String> visualizeReversedDepedencyPath(

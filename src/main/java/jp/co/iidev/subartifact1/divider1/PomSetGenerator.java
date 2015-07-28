@@ -51,15 +51,18 @@ public class PomSetGenerator {
 	public static class GenProject {
 		final Model project;
 		final List<ObjectTypeClassName> includeclasses;
+		final List<String> resources;
 		final FullArtifact fullartifact;
 
 		protected GenProject(Model project,
 				List<ObjectTypeClassName> includeclasses,
+				List<String> resources,
 				FullArtifact mainartifact) {
 			super();
 			this.project = project;
 			this.includeclasses = includeclasses;
 			this.fullartifact = mainartifact;
+			this.resources = resources;
 		}
 
 		public FullArtifact getFullartifact() {
@@ -73,7 +76,12 @@ public class PomSetGenerator {
 		public List<ObjectTypeClassName> getIncludeclasses() {
 			return includeclasses;
 		}
-
+		
+		public Iterable<String> getResourcePathsOfResourcesAndClasss(){
+			return Iterables.concat(
+					Lists.transform( includeclasses, (x) -> x.getResourcePath() )
+					, resources);
+		}
 		public static class FullArtifact {
 			final Model project;
 			final String resolvedClassifier;
@@ -139,6 +147,10 @@ public class PomSetGenerator {
 				Lists.newArrayList();
 		;
 		
+		List<String> incresources = 
+				Lists.newArrayList();
+		;
+		
 		Model m = new Model();
 		
 		m.setArtifactId(artifactId);
@@ -168,7 +180,7 @@ public class PomSetGenerator {
 		m.setParent( p );
 		
 		
-		return new GenProject(m, incclasses, new GenProject.FullArtifact(fullArtfactMainPOM, null, groupId));
+		return new GenProject(m, incclasses, incresources, new GenProject.FullArtifact(fullArtfactMainPOM, null, groupId));
 		
 	}
 	
@@ -226,7 +238,7 @@ public class PomSetGenerator {
 		m.setParent( p );
 		
 		
-		return new GenProject(m, incclasses, new GenProject.FullArtifact(fullArtifactPom, null, groupId));
+		return new GenProject(m, incclasses, deploymentDescription.getResources(),  new GenProject.FullArtifact(fullArtifactPom, null, groupId));
 		
 	}
 	

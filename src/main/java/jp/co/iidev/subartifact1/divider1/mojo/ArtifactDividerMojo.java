@@ -95,12 +95,34 @@ public class ArtifactDividerMojo extends AbstractMojo {
 	@Parameter(defaultValue= "${project.artifactId}-subarts-parent", property="divier.subArtifactsParentArtifactId", required = true )
 	private String subArtifactsParentArtifactId;
 	
+	/**
+	 * The resource inclusion rules of 'OR' chains for a sub-artifact.
+	 */
+	@Parameter
+	private PackageResourceInclusion[] packageResourceInclusionORs;
 	
 	/**
 	 * The sub-artifacts definitions to be created from the main artifact.
 	 */
 	@Parameter
 	private SubArtifact[] subartifacts;
+	
+	
+	static enum PackageResourceRule{
+		BySimpleClassNameRule
+		,
+		UnknownRule
+		;
+		
+		
+		static PackageResourceRule detect( PackageResourceInclusion r ){
+			if ( r.getBySimpleClassNameInPackage() != null )
+				return BySimpleClassNameRule;
+			return UnknownRule;
+		}
+	}
+	
+
 
 	public void execute() throws MojoExecutionException {
 

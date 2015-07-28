@@ -52,7 +52,7 @@
 								<filter>
 									<artifact th:text="${genproject.fullartifact.resolvedGroupId}+':'+${genproject.fullartifact.project.artifactId}">jp.co.iidev:JavaLib</artifact>
 									<includes th:remove="all-but-first">
-										<include th:each="inccls : ${genproject.includeclasses}" th:text="${inccls.resourcePath}">jp/co/iidev/algos/exceptions/IIDAssumptionViolation.class</include>
+										<include th:each="inccls : ${genproject.resourcePathsOfResourcesAndClasss}" th:text="${inccls}">jp/co/iidev/algos/exceptions/IIDAssumptionViolation.class</include>
 										<include>jp/co/iidev/algos/exceptions/Cls2.class</include>
 									</includes>
 								</filter>
