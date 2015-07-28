@@ -44,7 +44,6 @@ import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanAcceptor;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.AFPredicateInconsitency;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.CyclicArtifact;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ReferenceInspector;
-import jp.co.iidev.subartifact1.divider1.DivisionExecutor.MyFragment;
 import jp.co.iidev.subartifact1.divider1.DivisionExecutor.RelocatableClassPathUnit.RelocatableClass;
 import jp.co.iidev.subartifact1.divider1.mojo.SubArtifact;
 
@@ -77,20 +76,19 @@ public class DivisionExecutor {
 		;
 	}
 	
-	public static interface NameResolver{
+	public static interface AuthorizedNameResolver{
 		MyFragment resolve( MyFragment source, Clazz fragmentName );
 	}
 	
 	public static interface MyFragment extends ArtifactFragment{
-		Set<MyFragment> dependencyTargets( NameResolver r );
+		Set<MyFragment> dependencyTargets( AuthorizedNameResolver r );
 	}
 
-	static interface  ClazzSet extends ArtifactFragment, MyFragment {
-
+	static interface FragmentParty extends ArtifactFragment, MyFragment {
 		@Override
 		public default int compareTo(ArtifactFragment o) {
-			if (o instanceof DivisionExecutor.ClazzSet) {
-				DivisionExecutor.ClazzSet other = (DivisionExecutor.ClazzSet) o;
+			if (o instanceof DivisionExecutor.FragmentParty) {
+				DivisionExecutor.FragmentParty other = (DivisionExecutor.FragmentParty) o;
 				int oi = getOrder().compareTo(other.getOrder());
 				if (oi != 0)
 					return oi;
@@ -100,13 +98,13 @@ public class DivisionExecutor {
 			return -1;
 		}
 
-		public Set<Clazz> getMyNames() ;
-		public Set<Clazz> getDependingName() ;
+		public Set<Clazz> getMemberNames() ;
+		public Set<Clazz> getDependencyTargetNames() ;
 		public DivisionExecutor.ReportSortOrder getOrder();
 		
-		default Set<MyFragment> dependencyTargetsSTD( NameResolver r, MyFragment ...extraDeps ){
+		default Set<MyFragment> dependencyTargetsSTD( AuthorizedNameResolver r, MyFragment ...extraDeps ){
 			Set<MyFragment> x = Sets.newHashSet();
-			for ( Clazz c : getDependingName() ){
+			for ( Clazz c : getDependencyTargetNames() ){
 				MyFragment rx = r.resolve( this,  c);
 				if ( rx == null ){
 					//resolve error => unknown class or resource name
@@ -120,23 +118,23 @@ public class DivisionExecutor {
 
 	}
 	
-	static abstract class ClazzSetX implements ArtifactFragment, MyFragment, ClazzSet {
-		private final Set<Clazz> myNames;
-		private final Supplier<Set<Clazz>> dependingName;
+	static abstract class FragmentSet implements ArtifactFragment, MyFragment, FragmentParty {
+		private final Set<Clazz> memberNameSet;
+		private final Supplier<Set<Clazz>> dependencyTargetName;
 		private final DivisionExecutor.ReportSortOrder order;
 
-		protected ClazzSetX(Set<Clazz> myclazzset,
+		protected FragmentSet(Set<Clazz> memberNameSet,
 				Supplier<Set<Clazz>> depends, DivisionExecutor.ReportSortOrder ro) {
 			super();
-			this.myNames = myclazzset;
-			this.dependingName = depends;
+			this.memberNameSet = memberNameSet;
+			this.dependencyTargetName = depends;
 			this.order = ro;
 		}
 
 		@Override
 		public int compareTo(ArtifactFragment o) {
-			if (o instanceof DivisionExecutor.ClazzSet) {
-				DivisionExecutor.ClazzSet other = (DivisionExecutor.ClazzSet) o;
+			if (o instanceof DivisionExecutor.FragmentParty) {
+				DivisionExecutor.FragmentParty other = (DivisionExecutor.FragmentParty) o;
 				int oi = getOrder().compareTo(other.getOrder());
 				if (oi != 0)
 					return oi;
@@ -146,12 +144,12 @@ public class DivisionExecutor {
 			return -1;
 		}
 
-		public Set<Clazz> getMyNames() {
-			return myNames;
+		public Set<Clazz> getMemberNames() {
+			return memberNameSet;
 		}
 
-		public Set<Clazz> getDependingName() {
-			return dependingName.get();
+		public Set<Clazz> getDependencyTargetNames() {
+			return dependencyTargetName.get();
 		}
 
 		public DivisionExecutor.ReportSortOrder getOrder() {
@@ -161,11 +159,11 @@ public class DivisionExecutor {
 	}
 	
 	
-	static abstract class SingleClazz implements ArtifactFragment, MyFragment, ClazzSet {
+	static abstract class FragmentUnit implements ArtifactFragment, MyFragment, FragmentParty {
 		private final Clazz myName;
 		private final DivisionExecutor.ReportSortOrder order;
 
-		protected SingleClazz(Clazz myclazzset,
+		protected FragmentUnit(Clazz myclazzset,
 				 DivisionExecutor.ReportSortOrder ro) {
 			super();
 			this.myName = myclazzset;
@@ -174,8 +172,8 @@ public class DivisionExecutor {
 
 		@Override
 		public int compareTo(ArtifactFragment o) {
-			if (o instanceof DivisionExecutor.ClazzSet) {
-				DivisionExecutor.ClazzSet other = (DivisionExecutor.ClazzSet) o;
+			if (o instanceof DivisionExecutor.FragmentParty) {
+				DivisionExecutor.FragmentParty other = (DivisionExecutor.FragmentParty) o;
 				int oi = getOrder().compareTo(other.getOrder());
 				if (oi != 0)
 					return oi;
@@ -185,11 +183,11 @@ public class DivisionExecutor {
 			return -1;
 		}
 
-		public Set<Clazz> getMyNames() {
+		public Set<Clazz> getMemberNames() {
 			return Collections.singleton( myName );
 		}
 
-		public abstract Set<Clazz> getDependingName();
+		public abstract Set<Clazz> getDependencyTargetNames();
 
 		public DivisionExecutor.ReportSortOrder getOrder() {
 			return order;
@@ -198,71 +196,68 @@ public class DivisionExecutor {
 	}
 
 
-	public static interface MyClazzpathUnit/* ArtifactFragamentFinder */ {
-		public Map<Clazz, DivisionExecutor.ClazzSet> resolve(Set<Clazz> resolveRequired);
+	public static interface PartialNameResolver/* ArtifactFragamentFinder */ {
+		public Map<Clazz, DivisionExecutor.FragmentParty> resolveOnlyAuthorized(Set<Clazz> resolveRequired);
 
-		public static interface Standard extends DivisionExecutor.MyClazzpathUnit {
-			public Set<Clazz> getResolvClazzes();
+		public static interface Standard extends DivisionExecutor.PartialNameResolver {
+			public Set<Clazz> getAuthorizedNames();
 
-			public DivisionExecutor.ClazzSet forClazzSet(Clazz myclz);
+			public DivisionExecutor.FragmentParty resolveOne(Clazz authorizedNameForMe);
 
 			@Override
-			public default Map<Clazz, DivisionExecutor.ClazzSet> resolve(
+			public default Map<Clazz, DivisionExecutor.FragmentParty> resolveOnlyAuthorized(
 					Set<Clazz> resolveRequired) {
 				return Maps.transformEntries(
 						MapsIID.forSet(Sets.newHashSet(Sets.intersection(
-								resolveRequired, getResolvClazzes()))),
-						(clz, voidx) -> forClazzSet(clz));
+								resolveRequired, getAuthorizedNames()))),
+						(clz, voidx) -> resolveOne(clz));
 			}
 
 		}
 
-		public static interface HasExtraDependencies {
-			public void resolveAndAppendExtraDependenciesOnFinish(
-					MyClazzpath fullclasspath,
-					Multimap<ArtifactFragment, ArtifactFragment> extraDB);
-		}
+//		public static interface HasExtraDependencies {
+//			public void resolveAndAppendExtraDependenciesOnFinish(
+//					MyClazzpath fullclasspath,
+//					Multimap<ArtifactFragment, ArtifactFragment> extraDB);
+//		}
 	}
 
-	public class MyClazzpath implements NameResolver{
-		private final List<DivisionExecutor.MyClazzpathUnit> units;
-		private final Multimap<ArtifactFragment, ArtifactFragment> extractAdjacent = HashMultimap
-				.create();
-		private final Map<Clazz, DivisionExecutor.ClazzSet> resolvCache = Maps.newHashMap();
+	public class MyClazzpath implements AuthorizedNameResolver{
+		private final List<DivisionExecutor.PartialNameResolver> partialResolvers;
+//		private final Multimap<ArtifactFragment, ArtifactFragment> extractAdjacent = HashMultimap.create();
+		private final Map<Clazz, DivisionExecutor.FragmentParty> resolvCache = Maps.newHashMap();
 
-		protected MyClazzpath(List<? extends DivisionExecutor.MyClazzpathUnit> units) {
-			this.units = Lists.newArrayList(units);
-			fix();
+		protected MyClazzpath(List<? extends DivisionExecutor.PartialNameResolver> units) {
+			this.partialResolvers = Lists.newArrayList(units);
+//			fix();
 		}
 
 		public Set<ArtifactFragment> getAdjacent(ArtifactFragment a) {
-			boolean typeold = false;
-			if ( typeold ){
+//			if ( false ){
+//				Iterable<? extends ArtifactFragment> ia = Lists.newArrayList();
+//				if (a instanceof DivisionExecutor.ClazzSet) {
+//					DivisionExecutor.ClazzSet czs = (DivisionExecutor.ClazzSet) a;
+//					ia = resolve(czs.getDependingName(),
+//							(clz) -> {
+//								List<String> k = Lists.newArrayList();
+//								for ( Clazz refc : czs.getMyNames() ){
+//									if ( refc.getDependencies().contains(clz) ){
+//										k.add( refc.getName() );
+//									}}
+//								return k;
+//							} ).values();
+//				}
+//
+//				return Sets.newHashSet(
+//						Iterables.concat(extractAdjacent.get(a), ia));
+//			}else{
 				Iterable<? extends ArtifactFragment> ia = Lists.newArrayList();
-				if (a instanceof DivisionExecutor.ClazzSet) {
-					DivisionExecutor.ClazzSet czs = (DivisionExecutor.ClazzSet) a;
-					ia = resolve(czs.getDependingName(),
-							(clz) -> {
-								List<String> k = Lists.newArrayList();
-								for ( Clazz refc : czs.getMyNames() ){
-									if ( refc.getDependencies().contains(clz) ){
-										k.add( refc.getName() );
-									}}
-								return k;
-							} ).values();
-				}
-
-				return Sets.newHashSet(
-						Iterables.concat(extractAdjacent.get(a), ia));
-			}else{
-				Iterable<? extends ArtifactFragment> ia = Lists.newArrayList();
-				if ( a instanceof ClazzSet ){
-					ClazzSet b = (ClazzSet)a;
+				if ( a instanceof FragmentParty ){
+					FragmentParty b = (FragmentParty)a;
 					ia = b.dependencyTargets(this);
 				}
-				return Sets.newHashSet(
-						Iterables.concat(extractAdjacent.get(a), ia));
-			}
+				return Sets.newHashSet( ia );
+//			}
 		}
 
 		@Override
@@ -275,7 +270,7 @@ public class DivisionExecutor {
 					;
 		}
 
-		private Map<Clazz, DivisionExecutor.ClazzSet> resolve(
+		private Map<Clazz, DivisionExecutor.FragmentParty> resolve(
 				Set<Clazz> resolveRequiredO
 				,
 				Function<Clazz, List<String>> inverseReferencerLookupF
@@ -286,10 +281,10 @@ public class DivisionExecutor {
 				resolveRequired = Sets.newHashSet(Sets
 						.difference(resolveRequired, resolvCache.keySet()));
 				// ensure to load into the cache
-				for (DivisionExecutor.MyClazzpathUnit m : units) {
+				for (DivisionExecutor.PartialNameResolver m : partialResolvers) {
 					if (resolveRequired.isEmpty())
 						break;
-					Map<Clazz, DivisionExecutor.ClazzSet> res = m.resolve(resolveRequired);
+					Map<Clazz, DivisionExecutor.FragmentParty> res = m.resolveOnlyAuthorized(resolveRequired);
 					resolvCache.putAll(res);
 					resolveRequired = Sets.newHashSet(
 							Sets.difference(resolveRequired, res.keySet()));
@@ -321,7 +316,7 @@ public class DivisionExecutor {
 					}
 			}
 
-			Map<Clazz, DivisionExecutor.ClazzSet> s = Maps.newHashMap();
+			Map<Clazz, DivisionExecutor.FragmentParty> s = Maps.newHashMap();
 			for (Clazz c : resolveRequiredO) {
 				if (resolvCache.containsKey(c))
 					s.put(c, resolvCache.get(c));
@@ -332,16 +327,16 @@ public class DivisionExecutor {
 			return s;
 		}
 
-		public void fix() {
-			for (DivisionExecutor.MyClazzpathUnit m : units) {
-				if (m instanceof MyClazzpathUnit.HasExtraDependencies) {
-					MyClazzpathUnit.HasExtraDependencies ed = (MyClazzpathUnit.HasExtraDependencies) m;
-					ed.resolveAndAppendExtraDependenciesOnFinish(this,
-							extractAdjacent);
-				}
-			}
-
-		}
+//		public void fix() {
+//			for (DivisionExecutor.PartialNameResolver m : partialResolvers) {
+//				if (m instanceof PartialNameResolver.HasExtraDependencies) {
+//					PartialNameResolver.HasExtraDependencies ed = (PartialNameResolver.HasExtraDependencies) m;
+//					ed.resolveAndAppendExtraDependenciesOnFinish(this,
+//							extractAdjacent);
+//				}
+//			}
+//
+//		}
 	}
 
 	/**
@@ -351,25 +346,25 @@ public class DivisionExecutor {
 	 *
 	 */
 	public static class RelocatableClassPathUnit
-	implements MyClazzpathUnit.Standard {
-		final Set<Clazz> myClazzes;
+	implements PartialNameResolver.Standard {
+		final Set<Clazz> authorizedNames;
 
-		protected RelocatableClassPathUnit( Set<Clazz> classForJar) {
-			this.myClazzes = classForJar;
+		protected RelocatableClassPathUnit( Set<Clazz> authorizedNames) {
+			this.authorizedNames = authorizedNames;
 		}
 
 
 		@Override
-		public Set<Clazz> getResolvClazzes() {
-			return myClazzes;
+		public Set<Clazz> getAuthorizedNames() {
+			return authorizedNames;
 		}
 
 		@Override
-		public DivisionExecutor.ClazzSet forClazzSet(Clazz myclz) {
-			return RelocatableClass.forSingleClass(myclz);
+		public DivisionExecutor.FragmentParty resolveOne(Clazz authorizedNameForMe) {
+			return RelocatableClass.forSingleClass(authorizedNameForMe);
 		}
 
-		static class RelocatableClass extends DivisionExecutor.SingleClazz
+		static class RelocatableClass extends DivisionExecutor.FragmentUnit
 		implements ArtifactFragment.RelocatableFragment {
 
 			public static RelocatableClassPathUnit.RelocatableClass forSingleClass(Clazz clazz) {
@@ -379,7 +374,7 @@ public class DivisionExecutor {
 			private RelocatableClass(Clazz myclazzset ) {
 				super(myclazzset,  ReportSortOrder.RO3_ClazzSet);
 			}
-			private Clazz getClazz(){ return Iterables.get(getMyNames(), 0); }
+			private Clazz getClazz(){ return Iterables.get(getMemberNames(), 0); }
 
 			@Override
 			public String toString() {
@@ -387,13 +382,13 @@ public class DivisionExecutor {
 			}
 
 			@Override
-			public Set<MyFragment> dependencyTargets(NameResolver r) {
+			public Set<MyFragment> dependencyTargets(AuthorizedNameResolver r) {
 				return dependencyTargetsSTD(r);
 			}
 
 			@Override
-			public Set<Clazz> getDependingName() {
-				return naturalDepends(getMyNames()).get() ;
+			public Set<Clazz> getDependencyTargetNames() {
+				return naturalDepends(getMemberNames()).get() ;
 			}
 
 		}
@@ -401,20 +396,20 @@ public class DivisionExecutor {
 	}
 
 	protected static Supplier<Set<Clazz>> naturalDepends(
-			Set<Clazz> myclazzset) {
+			Set<Clazz> names) {
 		return () -> {
-			if (myclazzset.size() == 1)
+			if (names.size() == 1)
 				return Sets.difference(
-						Iterables.get(myclazzset, 0).getDependencies(),
-						myclazzset);
+						Iterables.get(names, 0).getDependencies(),
+						names);
 
 			return Sets
 					.newHashSet(
 							Sets.difference(
-									myclazzset.stream().flatMap((c) -> c
+									names.stream().flatMap((c) -> c
 											.getDependencies().stream())
 									.collect(Collectors.toSet()),
-									myclazzset));
+									names));
 		};
 	}
 
@@ -425,9 +420,9 @@ public class DivisionExecutor {
 	 * @author kuzukami_user
 	 *
 	 */
-	public abstract static class SubArtifactRoot extends DivisionExecutor.ClazzSetX
+	public abstract static class SubArtifactRoot extends DivisionExecutor.FragmentSet
 	implements ArtifactFragment.OutputArtifact,
-	MyClazzpathUnit.Standard {
+	PartialNameResolver.Standard {
 		protected final SubArtifact submodule;
 
 		protected SubArtifactRoot(SubArtifact submodule,
@@ -437,8 +432,8 @@ public class DivisionExecutor {
 		}
 
 		@Override
-		public Set<Clazz> getResolvClazzes() {
-			return getMyNames();
+		public Set<Clazz> getAuthorizedNames() {
+			return getMemberNames();
 		}
 
 
@@ -471,34 +466,35 @@ public class DivisionExecutor {
 //		}
 
 		public static class DetailTrace extends DivisionExecutor.SubArtifactRoot
-		implements MyClazzpathUnit.HasExtraDependencies {
-			private final Map<Clazz, SubArtifactRootClass> clazzesForTrace;
+//		implements PartialNameResolver.HasExtraDependencies
+		{
+			private final Map<Clazz, SubArtifactRootClass> resolveMap;
 
 			protected DetailTrace(SubArtifact submodule,
 					Set<Clazz> myclazzes) {
 				super(submodule, myclazzes, () -> myclazzes);
 
-				clazzesForTrace = Maps.newHashMap(
+				resolveMap = Maps.newHashMap(
 						Maps.transformEntries(MapsIID.forSet(myclazzes),
 								(clx, vd) -> new SubArtifactRootClass(clx)));
 
 			}
 
-			@Override
-			public void resolveAndAppendExtraDependenciesOnFinish(
-					MyClazzpath fullclasspath,
-					Multimap<ArtifactFragment, ArtifactFragment> extraDB) {
-				for (SubArtifactRootClass m : clazzesForTrace.values())
-					extraDB.put(m, this);
-			}
+//			@Override
+//			public void resolveAndAppendExtraDependenciesOnFinish(
+//					MyClazzpath fullclasspath,
+//					Multimap<ArtifactFragment, ArtifactFragment> extraDB) {
+//				for (SubArtifactRootClass m : clazzesForTrace.values())
+//					extraDB.put(m, this);
+//			}
 
-			public class SubArtifactRootClass extends DivisionExecutor.SingleClazz
+			public class SubArtifactRootClass extends DivisionExecutor.FragmentUnit
 			implements DebugContractable {
 				private SubArtifactRootClass(Clazz myclazz) {
 					super(myclazz, ReportSortOrder.RO5_DEBUG);
 				}
 				private SubArtifactDefinition getMod(){ return DetailTrace.this.submodule; }
-				private Clazz getClazz(){ return Iterables.get(getMyNames(), 0); }
+				private Clazz getClazz(){ return Iterables.get(getMemberNames(), 0); }
 
 
 				@Override
@@ -511,30 +507,30 @@ public class DivisionExecutor {
 					return DetailTrace.this;
 				}
 				@Override
-				public Set<MyFragment> dependencyTargets(NameResolver r) {
+				public Set<MyFragment> dependencyTargets(AuthorizedNameResolver r) {
 					return dependencyTargetsSTD(r, DetailTrace.this);
 				}
 				@Override
-				public Set<Clazz> getDependingName() {
-					return naturalDepends(getMyNames()).get();
+				public Set<Clazz> getDependencyTargetNames() {
+					return naturalDepends(getMemberNames()).get();
 				}
 			}
 
 			@Override
-			public DivisionExecutor.ClazzSet forClazzSet(Clazz myclz) {
-				return clazzesForTrace.get(myclz);
+			public DivisionExecutor.FragmentParty resolveOne(Clazz myclz) {
+				return resolveMap.get(myclz);
 			}
 
 			@Override
-			public Set<MyFragment> dependencyTargets(NameResolver r) {
+			public Set<MyFragment> dependencyTargets(AuthorizedNameResolver r) {
 				return dependencyTargetsSTD(r);
 			}
 
 		}
 	}
 
-	public abstract static class LibArtifact extends DivisionExecutor.ClazzSetX implements
-	ArtifactFragment.LibraryArtifact, MyClazzpathUnit.Standard {
+	public abstract static class LibArtifact extends DivisionExecutor.FragmentSet implements
+	ArtifactFragment.LibraryArtifact, PartialNameResolver.Standard {
 		protected final File jarFile;
 		private final Dependency pomDependency;
 
@@ -551,8 +547,8 @@ public class DivisionExecutor {
 		}
 
 		@Override
-		public Set<Clazz> getResolvClazzes() {
-			return getMyNames();
+		public Set<Clazz> getAuthorizedNames() {
+			return getMemberNames();
 		}
 
 //		protected static DivisionExecutor.LibArtifact forLessMemory( Dependency dep,  File jarFile,
@@ -583,7 +579,8 @@ public class DivisionExecutor {
 //		}
 
 		public static class DetailTrace extends DivisionExecutor.LibArtifact
-		implements MyClazzpathUnit.HasExtraDependencies {
+//		implements PartialNameResolver.HasExtraDependencies
+		{
 
 			private Map<Clazz, LibClass> apiClass = Maps.newHashMap();
 
@@ -594,7 +591,7 @@ public class DivisionExecutor {
 				}
 			}
 
-			public class LibClass extends DivisionExecutor.SingleClazz
+			public class LibClass extends DivisionExecutor.FragmentUnit
 			implements DebugContractable {
 
 				protected LibClass(Clazz myclazz,
@@ -602,7 +599,7 @@ public class DivisionExecutor {
 					super(myclazz, ro);
 				}
 				private String getLibname() { return  DetailTrace.this.jarFile.getName(); }
-				private Clazz getClazz() { return  Iterables.get(getMyNames(), 0); }
+				private Clazz getClazz() { return  Iterables.get(getMemberNames(), 0); }
 
 
 				@Override
@@ -615,31 +612,31 @@ public class DivisionExecutor {
 					return DetailTrace.this;
 				}
 				@Override
-				public Set<MyFragment> dependencyTargets(NameResolver r) {
+				public Set<MyFragment> dependencyTargets(AuthorizedNameResolver r) {
 					return dependencyTargetsSTD(r, DetailTrace.this);
 				}
 				@Override
-				public Set<Clazz> getDependingName() {
+				public Set<Clazz> getDependencyTargetNames() {
 					return Collections.emptySet();
 				}
 
 			}
 
-			@Override
-			public void resolveAndAppendExtraDependenciesOnFinish(
-					MyClazzpath fullclasspath,
-					Multimap<ArtifactFragment, ArtifactFragment> extraDB) {
-				for (LibClass c : apiClass.values())
-					extraDB.put(c, this);
-			}
+//			@Override
+//			public void resolveAndAppendExtraDependenciesOnFinish(
+//					MyClazzpath fullclasspath,
+//					Multimap<ArtifactFragment, ArtifactFragment> extraDB) {
+//				for (LibClass c : apiClass.values())
+//					extraDB.put(c, this);
+//			}
 
 			@Override
-			public DivisionExecutor.ClazzSet forClazzSet(Clazz myclz) {
+			public DivisionExecutor.FragmentParty resolveOne(Clazz myclz) {
 				return apiClass.get(myclz);
 			}
 			
 			@Override
-			public Set<MyFragment> dependencyTargets(NameResolver r) {
+			public Set<MyFragment> dependencyTargets(AuthorizedNameResolver r) {
 				return dependencyTargetsSTD(r);
 			}
 
@@ -781,8 +778,9 @@ public class DivisionExecutor {
 						, Predicates.in( mainJarLibDependencies ) ))
 				.collect(Collectors.toList());
 
-		DivisionExecutor.RelocatableClassPathUnit relocatableClasses = new RelocatableClassPathUnit(
-				mainJarCpUnit.getClazzes());
+		DivisionExecutor.RelocatableClassPathUnit relocatableClasses =
+				new RelocatableClassPathUnit(
+						mainJarCpUnit.getClazzes());
 
 		MyClazzpath clzpath = new MyClazzpath(
 				FluentIterablesIID
@@ -846,7 +844,7 @@ public class DivisionExecutor {
 						+ deployAnchor.toString());
 				if (deployAnchor instanceof DivisionExecutor.SubArtifactRoot) {
 					DivisionExecutor.SubArtifactRoot submod = (DivisionExecutor.SubArtifactRoot) deployAnchor;
-					submod.getMyNames().stream().sorted()
+					submod.getMemberNames().stream().sorted()
 					.forEach((c) -> {
 						System.out.println("    Sub-Artifact Root Class: "
 								+ c.getName());
@@ -1033,7 +1031,7 @@ public class DivisionExecutor {
 					}
 				}
 				
-				for ( Clazz rootCls : main.getMyNames() )
+				for ( Clazz rootCls : main.getMemberNames() )
 					deploy_classnames.add(rootCls.getName());
 						
 				boolean fullEmpty = jardeps.isEmpty() && subart_deps.isEmpty() && deploy_classnames.isEmpty();
