@@ -217,11 +217,10 @@ public class ArtifactDividerMojo extends AbstractMojo {
 			try {
 				LinkedHashMap<SubArtifactDefinition, SubArtifactDeployment>
 				buildPlan =
-						new DivisionExecutor(
-								lf.createLoggable(DivisionExecutor.class)
-						)
+						new DivisionExecutor( lf.createLoggable(DivisionExecutor.class) )
 						.planDivision(
-								targetJar
+								lf.createLoggable(DivisionExecutor.class)
+								, targetJar
 								, rootSubArtifactId
 								, Arrays.asList(
 										subartifacts == null

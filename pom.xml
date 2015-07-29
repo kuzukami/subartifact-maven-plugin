@@ -59,22 +59,20 @@
 			<version>2.1.4.RELEASE</version>
 		</dependency>
 		<dependency>
-			<groupId>org.javassist</groupId>
-			<artifactId>javassist</artifactId>
-			<version>3.20.0-GA</version>
-		</dependency>
-		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
 			<version>3.1</version>
 			<scope>compile</scope>
 		</dependency>
+		<!-- 
 		<dependency>
 			<groupId>org.vafer</groupId>
 			<artifactId>jdependency</artifactId>
 			<version>1.0</version>
 			<scope>compile</scope>
 		</dependency>
+		 -->
+
 		<dependency>
 			<groupId>org.apache.maven.plugin-tools</groupId>
 			<artifactId>maven-plugin-annotations</artifactId>
@@ -97,6 +95,11 @@
 			<artifactId>maven-core</artifactId>
 			<version>${mavenVersion}</version>
 			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-commons</artifactId>
+			<version>5.0.4</version>
 		</dependency>
 	</dependencies>
 

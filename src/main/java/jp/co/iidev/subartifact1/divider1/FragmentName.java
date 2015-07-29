@@ -1,31 +1,29 @@
 package jp.co.iidev.subartifact1.divider1;
 
 import java.util.Set;
+import java.util.jar.JarInputStream;
+
+import jp.co.iidev.subartifact1.divider1.JARIndex.MyJarEntry;
 
 interface FragmentName{
-	public String getAdressName();
+	public String getAddressName();
+	public default boolean isClassFileResource(){
+		return JARIndex.isClassfileResourceName(getAddressName());
+	}
+	
+
 	
 	
-	public static class Clazz implements FragmentName{
+	static class Resource implements FragmentName{
+		
 		private final String addressName;
 		@Override
-		public String getAdressName() {
+		public String getAddressName() {
 			return addressName;
 		}
-		protected Clazz(String classname) {
-			super();
-			String x = classname.replace(".", "/") + ".class";
+		protected Resource(String resourcePath) {
+			String x = resourcePath;
 			this.addressName = x;
-		}
-
-		public String getClassName(){
-			return addressName.replace("/", ".");
-		}
-		
-		
-		@Override
-		public String toString() {
-			return "Clazz [addressName=" + addressName + "]";
 		}
 		@Override
 		public int hashCode() {
@@ -35,6 +33,11 @@ interface FragmentName{
 					+ ((addressName == null) ? 0 : addressName.hashCode());
 			return result;
 		}
+		
+		@Override
+		public String toString() {
+			return "Resource [addressName=" + addressName + "]";
+		}
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj)
@@ -43,7 +46,7 @@ interface FragmentName{
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			Clazz other = (Clazz) obj;
+			Resource other = (Resource) obj;
 			if (addressName == null) {
 				if (other.addressName != null)
 					return false;
@@ -51,11 +54,44 @@ interface FragmentName{
 				return false;
 			return true;
 		}
+
+	}
+	
+	static class Clazz  extends Resource implements FragmentName{
+
+		Clazz(String resourceName) {
+			super( resourceName );
+		}
+
+		public String getClassName(){
+			return getAddressName().replace("/", ".");
+		}
+		
+		
+		@Override
+		public String toString() {
+			return "Clazz [addressName=" + getAddressName() + "]";
+		}
+
 	}
 	
 	public static FragmentName forClassName( String classname ){
-		return new Clazz(classname);
+		String x = classname.replace(".", "/") + ".class";
+		return new Clazz(x);
 	}
 	
+//	private static FragmentName forResource( String resourcepath ){
+//		return new Resource(resourcepath);
+//	}
 	
+	public static FragmentName forJarEntryName( String resourceName ){
+		if ( JARIndex.isClassfileResourceName(resourceName) )
+			return new Clazz(resourceName);
+		else
+			return new Resource(resourceName);
+	}
+	
+	public static FragmentName forJarEntry( MyJarEntry je ){
+		return forJarEntryName(je.getJarEntryName());
+	}
 }

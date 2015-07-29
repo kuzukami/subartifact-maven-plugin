@@ -1,5 +1,6 @@
 package jp.co.iidev.subartifact1.divider1;
 
+import java.util.Arrays;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collector;
@@ -12,23 +13,41 @@ public class TraversersV0 {
 	
 	public static<T,A,R> R stackTraverse(
 			T start, Function<? super T,? extends Iterable<T>> next, Collector<T,A,R> collector ){
+		return stackTraverseL(Arrays.asList(start), next, collector);
+	}
+		
+	public static<T,A,R> R stackTraverseL(
+			Iterable<? extends T> start, Function<? super T,? extends Iterable<T>> next, Collector<T,A,R> collector ){
 		return collector.finisher().apply(
-				stackTraverse(start, next, collector.supplier().get(), collector, Sets.newHashSet())
+				stackTraverseL(start, next, collector.supplier().get(), collector, Sets.newHashSet())
 				);
 	}
 	
 	
-	private static<T,A,R> A stackTraverse(
+	private static<T,A,R> A stackTraverseL(
+			Iterable<? extends T> start, Function<? super T,? extends Iterable<T>> next, A currentA, Collector<T,A,R> collector,
+			Set<T> seen ){
+		for ( T x : start ){
+			stackTraverseS(x, next, currentA, collector, seen);
+		}
+		return currentA;
+	}
+	
+	private static<T,A,R> A stackTraverseS(
 			T start, Function<? super T,? extends Iterable<T>> next, A currentA, Collector<T,A,R> collector,
 			Set<T> seen ){
+		if ( seen.contains(start) ) return currentA;
+		
 		collector.accumulator().accept(currentA, start);
 		seen.add(start);
 		
-		for ( T t : next.apply(start) ){
-			if ( seen.contains(t) ) continue;
-			
-			stackTraverse(t, next, currentA, collector,  seen);
-		}
+		stackTraverseL(
+				next.apply(start),
+				next,
+				currentA,
+				collector,
+				seen );
+		
 		return currentA;
 	}
 	
