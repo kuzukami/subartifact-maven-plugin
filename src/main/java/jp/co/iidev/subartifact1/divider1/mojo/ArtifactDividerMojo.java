@@ -101,7 +101,16 @@ public class ArtifactDividerMojo extends AbstractMojo {
 	
 	
 	@Parameter
-	private OptionalPropagation[] genericPropagateOptions = new OptionalPropagation[0];
+	private OptionalPropagation[] defaultRootTransitivePropagations = new OptionalPropagation[0];	
+	
+	@Parameter
+	private OptionalPropagation[] defaultRootSourceReferencePropagations = new OptionalPropagation[0];	
+	
+	@Parameter
+	private OptionalPropagation[] defaultSubartifactSourceReferencePropagations = new OptionalPropagation[0];
+	
+	@Parameter
+	private OptionalPropagation[] globalReferencePropagations = new OptionalPropagation[0];	
 	
 
 	public void execute() throws MojoExecutionException {
@@ -206,7 +215,10 @@ public class ArtifactDividerMojo extends AbstractMojo {
 										? new SubArtifact[0] : subartifacts)
 								, compiletimeClasspath
 								, not(in(ImmutableSet.of( rtjar, targetJar )))
-								, genericPropagateOptions
+								, defaultRootTransitivePropagations
+								, defaultRootSourceReferencePropagations
+								, defaultSubartifactSourceReferencePropagations
+								, globalReferencePropagations
 								, lf
 								);
 

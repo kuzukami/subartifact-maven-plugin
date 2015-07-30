@@ -50,17 +50,17 @@ public class PomSetGenerator {
 
 	public static class GenProject {
 		final Model project;
-		final List<ObjectTypeClassName> includeclasses;
+//		final List<ObjectTypeClassName> includeclasses;
 		final List<String> resources;
 		final FullArtifact fullartifact;
 
 		protected GenProject(Model project,
-				List<ObjectTypeClassName> includeclasses,
+//				List<ObjectTypeClassName> includeclasses,
 				List<String> resources,
 				FullArtifact mainartifact) {
 			super();
 			this.project = project;
-			this.includeclasses = includeclasses;
+//			this.includeclasses = includeclasses;
 			this.fullartifact = mainartifact;
 			this.resources = resources;
 		}
@@ -73,13 +73,14 @@ public class PomSetGenerator {
 			return project;
 		}
 
-		public List<ObjectTypeClassName> getIncludeclasses() {
-			return includeclasses;
-		}
+//		public List<ObjectTypeClassName> getIncludeclasses() {
+//			return includeclasses;
+//		}
 		
 		public Iterable<String> getResourcePathsOfResourcesAndClasss(){
 			return Iterables.concat(
-					Lists.transform( includeclasses, (x) -> x.getResourcePath() )
+//					Lists.transform( includeclasses, (x) -> x.getResourcePath() )
+					Arrays.asList()
 					, resources);
 		}
 		public static class FullArtifact {
@@ -143,9 +144,9 @@ public class PomSetGenerator {
 			Model fullArtfactMainPOM
 			){
 		
-		List<ObjectTypeClassName> incclasses = 
-				Lists.newArrayList();
-		;
+//		List<ObjectTypeClassName> incclasses = 
+//				Lists.newArrayList();
+//		;
 		
 		List<String> incresources = 
 				Lists.newArrayList();
@@ -180,7 +181,7 @@ public class PomSetGenerator {
 		m.setParent( p );
 		
 		
-		return new GenProject(m, incclasses, incresources, new GenProject.FullArtifact(fullArtfactMainPOM, null, groupId));
+		return new GenProject(m, /*incclasses, */ incresources, new GenProject.FullArtifact(fullArtfactMainPOM, null, groupId));
 		
 	}
 	
@@ -193,13 +194,13 @@ public class PomSetGenerator {
 //			, Predicate<File> usableJAR
 			){
 		
-		List<ObjectTypeClassName> incclasses = 
-		FluentIterable.from(
-				Ordering.natural().sortedCopy( deploymentDescription.getDeployClassNames() ) )
-		.transform( ObjectTypeClassName::forClassName )
-//		.toImmutableList()
-		.toList()
-		;
+//		List<ObjectTypeClassName> incclasses = 
+//		FluentIterable.from(
+//				Ordering.natural().sortedCopy( deploymentDescription.getResources() ) )
+//		.transform( ObjectTypeClassName::forClassName )
+////		.toImmutableList()
+//		.toList()
+//		;
 		
 		Model m = new Model();
 		
@@ -238,7 +239,7 @@ public class PomSetGenerator {
 		m.setParent( p );
 		
 		
-		return new GenProject(m, incclasses, deploymentDescription.getResources(),  new GenProject.FullArtifact(fullArtifactPom, null, groupId));
+		return new GenProject(m, deploymentDescription.getResources(),  new GenProject.FullArtifact(fullArtifactPom, null, groupId));
 		
 	}
 	

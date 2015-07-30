@@ -1,43 +1,43 @@
 package jp.co.iidev.subartifact1.divider1;
 
-import java.util.Set;
-import java.util.jar.JarInputStream;
 
 import jp.co.iidev.subartifact1.divider1.JARIndex.MyJarEntry;
 
-interface FragmentName{
-	public String getAddressName();
+interface FragmentName extends Comparable<FragmentName>{
+	public String getResName();
 	public default boolean isClassFileResource(){
-		return JARIndex.isClassfileResourceName(getAddressName());
+		return JARIndex.isClassfileResourceName(getResName());
 	}
 	
 
 	
 	
-	static class Resource implements FragmentName{
+	static class ResourceName implements FragmentName{
 		
-		private final String addressName;
+		private final String resName;
 		@Override
-		public String getAddressName() {
-			return addressName;
+		public String getResName() {
+			return resName;
 		}
-		protected Resource(String resourcePath) {
+		protected ResourceName(String resourcePath) {
 			String x = resourcePath;
-			this.addressName = x;
+			this.resName = x;
 		}
 		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result
-					+ ((addressName == null) ? 0 : addressName.hashCode());
+					+ ((resName == null) ? 0 : resName.hashCode());
 			return result;
 		}
 		
+
 		@Override
 		public String toString() {
-			return "Resource [addressName=" + addressName + "]";
+			return  ResourceName.class.getSimpleName() +  " [" + resName + "]";
 		}
+		
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj)
@@ -46,38 +46,42 @@ interface FragmentName{
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			Resource other = (Resource) obj;
-			if (addressName == null) {
-				if (other.addressName != null)
+			ResourceName other = (ResourceName) obj;
+			if (resName == null) {
+				if (other.resName != null)
 					return false;
-			} else if (!addressName.equals(other.addressName))
+			} else if (!resName.equals(other.resName))
 				return false;
 			return true;
+		}
+		
+		@Override
+		public int compareTo(FragmentName o) {
+			return toString().compareTo(o.toString());
 		}
 
 	}
 	
-	static class Clazz  extends Resource implements FragmentName{
+	static class ClassName  extends ResourceName implements FragmentName{
 
-		Clazz(String resourceName) {
-			super( resourceName );
+		ClassName(String resourcePath) {
+			super( resourcePath );
 		}
 
 		public String getClassName(){
-			return getAddressName().replace("/", ".");
-		}
-		
-		
-		@Override
-		public String toString() {
-			return "Clazz [addressName=" + getAddressName() + "]";
+			String x =  getResName().replace("/", ".");
+			return x.substring(0, x.length() - ".class".length() );
 		}
 
+		@Override
+		public String toString() {
+			return  ClassName.class.getSimpleName() + " [" + getClassName() + "]";
+		}
 	}
 	
 	public static FragmentName forClassName( String classname ){
 		String x = classname.replace(".", "/") + ".class";
-		return new Clazz(x);
+		return new ClassName(x);
 	}
 	
 //	private static FragmentName forResource( String resourcepath ){
@@ -86,9 +90,9 @@ interface FragmentName{
 	
 	public static FragmentName forJarEntryName( String resourceName ){
 		if ( JARIndex.isClassfileResourceName(resourceName) )
-			return new Clazz(resourceName);
+			return new ClassName(resourceName);
 		else
-			return new Resource(resourceName);
+			return new ResourceName(resourceName);
 	}
 	
 	public static FragmentName forJarEntry( MyJarEntry je ){

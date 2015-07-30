@@ -106,7 +106,7 @@ class DetailJarAnalysis {
 	}
 	
 	public MyJarEntry getEntry( FragmentName fn ){
-		return index.getEntry(fn.getAddressName());
+		return index.getEntry(fn.getResName());
 	}
 	
 	public BiMap<FragmentName,MyJarEntry> getEntries(){
@@ -114,7 +114,10 @@ class DetailJarAnalysis {
 	}
 	
 	public Optional<ClassNode> getClassNode( String classname ){
-		return getClassNode(getEntry(FragmentName.forClassName(classname)));
+		return getClassNode(FragmentName.forClassName(classname));
+	}
+	public Optional<ClassNode> getClassNode( FragmentName classfragment ){
+		return getClassNode(getEntry(classfragment));
 	}
 	
 	public Optional<ClassNode> getClassNode(  MyJarEntry entry ){

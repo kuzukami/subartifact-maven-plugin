@@ -1,35 +1,52 @@
 package jp.co.iidev.subartifact1.divider1.mojo;
 
+import org.apache.commons.lang3.ArrayUtils;
+
 public class RootMark {
 	
-	private String byAnnotation = null;
-	private String[] byIncludeResourcePatterns = null;
-	private boolean inheritsDefaultOptionalPropagations = true;
+	 String byAnnotation = null;
+	 String byIncludeResourcePattern = null;
+	 boolean inheritsOuterDefaultRootTransitivePropagations = true;
+	 boolean inheritsOuterDefaultRootSourceReferencePropagations = true;
 	
-	private OptionalPropagation[] optionalPropagations = new OptionalPropagation[0];
+	 OptionalPropagation[] rootTransitivePropagations = new OptionalPropagation[0];
+	 OptionalPropagation[] rootSourceReferencePropagations = new OptionalPropagation[0];
 
 	public String getByAnnotation() {
 		return byAnnotation;
 	}
 
-	public String[] getByIncludeResourcePatterns() {
-		return byIncludeResourcePatterns;
+	public String getByIncludeResourcePattern() {
+		return byIncludeResourcePattern;
 	}
 
 	void setByAnnotation(String byAnnotation) {
 		this.byAnnotation = byAnnotation;
 	}
 
-	void setByIncludeResourcePatterns(String[] byIncludeResourcePatterns) {
-		this.byIncludeResourcePatterns = byIncludeResourcePatterns;
+	void setByIncludeResourcePattern(String byIncludeResourcePattern) {
+		this.byIncludeResourcePattern = byIncludeResourcePattern;
 	}
 
-	public OptionalPropagation[] getOptionalPropagations() {
-		return optionalPropagations;
+
+	public boolean inheritsOuterRootDefaultRootTransitivePropagations() {
+		return inheritsOuterDefaultRootTransitivePropagations;
 	}
 
-	public boolean inheritsDefaultOptionalPropagations() {
-		return inheritsDefaultOptionalPropagations;
+	public boolean inheritsOuterRootDefaultReferencePropagations() {
+		return inheritsOuterDefaultRootSourceReferencePropagations;
+	}
+
+	public OptionalPropagation[] getRootTransitivePropagations( OptionalPropagation [] outerTransitive ) {
+		if ( inheritsOuterRootDefaultRootTransitivePropagations() )
+			return ArrayUtils.addAll(rootTransitivePropagations, outerTransitive);
+		return rootTransitivePropagations;
+	}
+	
+	public OptionalPropagation[] getRootSourceReferencePropagations( OptionalPropagation[] outerReference ) {
+		if ( inheritsOuterRootDefaultReferencePropagations() )
+			return ArrayUtils.addAll(rootSourceReferencePropagations, outerReference);
+		return rootSourceReferencePropagations;
 	}
 
 }

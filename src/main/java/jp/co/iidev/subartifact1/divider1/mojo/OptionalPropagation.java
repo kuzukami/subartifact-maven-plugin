@@ -5,11 +5,11 @@ import java.util.Set;
 
 public class OptionalPropagation{
 //	Set<Modifier> targetClassModifierOR = EnumSet.allOf(Modifier.class);	
-	PredefinedPropagateOption usePredefined = null;
+	PredefinedPropagateOption byPredefined = null;
 	
 	Set<ResourceType> targetResourceTypeOR = EnumSet.allOf(ResourceType.class);
 	
-	boolean transitvePropagate = false;
+//	boolean transitvePropagate = false;
 	
 	boolean byServicesFileContents = false;
 	boolean byInnerClassSignature = false;
@@ -21,9 +21,9 @@ public class OptionalPropagation{
 	public boolean isByInnerClassSignature() {
 		return byInnerClassSignature;
 	}
-	public boolean isTransitvePropagate() {
-		return transitvePropagate;
-	}
+//	public boolean isTransitvePropagate() {
+//		return transitvePropagate;
+//	}
 	public boolean isByServicesFileContents() {
 		return byServicesFileContents;
 	}
@@ -36,8 +36,8 @@ public class OptionalPropagation{
 	public Set<ResourceType> getTargetResourceTypeOR() {
 		return targetResourceTypeOR;
 	}
-	public PredefinedPropagateOption getUsePredefined() {
-		return usePredefined;
+	public PredefinedPropagateOption getByPredefined() {
+		return byPredefined;
 	}
 	
 }

@@ -1,24 +1,14 @@
 package jp.co.iidev.subartifact1.divider1;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InvalidObjectException;
-import java.nio.file.Files;
-import java.nio.file.OpenOption;
-import java.nio.file.StandardOpenOption;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.jar.JarInputStream;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import javax.management.RuntimeErrorException;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -66,9 +56,11 @@ class JARIndex implements AutoCloseable{
 		FluentIterable<MyJarEntry> me = extractEntries(o);
 		JARIndex  j = new JARIndex(o );
 		me.forEach((e) -> {
-			j.entries.put(
-					FragmentName.forJarEntry( e )
-					, e);
+			if ( e.isFile() ){
+				j.entries.put(
+						FragmentName.forJarEntry( e )
+						, e);
+			}
 		});
 		return j;
 	}

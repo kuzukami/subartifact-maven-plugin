@@ -51,7 +51,7 @@ import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanAcceptor;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.AFPredicateInconsitency;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.CyclicArtifact;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ReferenceInspector;
-import jp.co.iidev.subartifact1.divider1.DivisionExecutor.RelocatableClassPathUnit.RelocatableClass;
+import jp.co.iidev.subartifact1.divider1.DivisionExecutor.RelocatablesClassPathUnit.Relocatable;
 import jp.co.iidev.subartifact1.divider1.JARIndex.MyJarEntry;
 import jp.co.iidev.subartifact1.divider1.mojo.OptionalPropagation;
 import jp.co.iidev.subartifact1.divider1.mojo.RootMark;
@@ -100,7 +100,10 @@ public class DivisionExecutor {
 			Iterable<? extends SubArtifact> subartifactsInTargetJar,
 			LinkedHashMap<File, Dependency> compiletimeClasspath,
 			Predicate<File> outputClasspathAliveFilter,
-			OptionalPropagation[] genericPropagateOptions,
+			OptionalPropagation[] defaultRootTransitivePropagations,
+			OptionalPropagation[] defaultRootSourceRefernecePropagations,
+			OptionalPropagation[] defaultSubartifactSourceReferencePropagations,
+			OptionalPropagation[] globalReferencePropagations,
 			LoggableFactory lgf)
 					throws CyclicArtifact, AFPredicateInconsitency {
 		// ClassPool loader = new ClassPool(false);
@@ -135,7 +138,7 @@ public class DivisionExecutor {
 
 		MainJarManager pc = new MainJarManager(
 				new DetailJarAnalysis(jindexCache.getUnchecked(mainjar)));
-		pc.buildOptionalRelation(genericPropagateOptions);
+		pc.propagateGlobalReference(globalReferencePropagations);
 		
 
 		SubArtifact rootSubart;
@@ -158,6 +161,12 @@ public class DivisionExecutor {
 								jm
 								,
 								pc
+								,
+								defaultRootTransitivePropagations
+								,
+								defaultRootSourceRefernecePropagations
+								,
+								defaultSubartifactSourceReferencePropagations
 								)));
 		
 		
@@ -194,8 +203,8 @@ public class DivisionExecutor {
 			}
 		}
 
-		DivisionExecutor.RelocatableClassPathUnit relocatableClasses =
-				RelocatableClassPathUnit.forResourceSet(
+		DivisionExecutor.RelocatablesClassPathUnit relocatableClasses =
+				RelocatablesClassPathUnit.forResourceSet(
 						pc.getLeftAll().keySet(),
 						pc );
 
@@ -235,8 +244,8 @@ public class DivisionExecutor {
 	public static enum ReportSortOrder {
 		RO1_SUBMODULE,
 		RO2_JAR,
-		RO3_ClazzSet,
-		RO4_RESOURCE,
+		RO3_RELOCATABLE,
+//		RO4_RESOURCE,
 		RO5_DEBUG,;
 	}
 
@@ -511,7 +520,7 @@ public class DivisionExecutor {
 					for (FragmentName unknownClz : resolveRequired) {
 						// http://stackoverflow.com/questions/18769282/does-anyone-have-background-on-the-java-annotation-java-lang-synthetic
 						if ("java.lang.Synthetic"
-								.equals(unknownClz.getAddressName())) {
+								.equals(unknownClz.getResName())) {
 							// see org/objectweb/asm/ClassReader.java
 							// workaround for a bug in javac (javac compiler
 							// generates a parameter
@@ -526,13 +535,13 @@ public class DivisionExecutor {
 							// around supposes that the synthetic parameters are
 							// the first ones.
 							debug("{} is found in ( {} )",
-									unknownClz.getAddressName(),
+									unknownClz.getResName(),
 									Joiner.on(", ")
 											.join(inverseReferencerLookupF
 													.apply(unknownClz)));
 						} else {
 							error("There is an unknown class {} in ( {} )",
-									unknownClz.getAddressName(),
+									unknownClz.getResName(),
 									Joiner.on(", ")
 											.join(inverseReferencerLookupF
 													.apply(unknownClz)));
@@ -572,21 +581,21 @@ public class DivisionExecutor {
 	 * @author kuzukami_user
 	 *
 	 */
-	static class RelocatableClassPathUnit
+	static class RelocatablesClassPathUnit
 			implements PartialNameResolver.Standard.Resourced {
 		final MainJarManager jarmanager;
 		final Map<FragmentName, FragmentParty> authorizedNames;
 
-		protected RelocatableClassPathUnit(Set<FragmentName> authorizedNames,
+		protected RelocatablesClassPathUnit(Set<FragmentName> authorizedNames,
 				MainJarManager resource) {
 			this.authorizedNames = Maps.newHashMap(
 					Maps.asMap(authorizedNames, (nm) -> forSingleClass(nm)));
 			this.jarmanager = resource;
 		}
-		protected static RelocatableClassPathUnit forResourceSet(
+		protected static RelocatablesClassPathUnit forResourceSet(
 				Set<FragmentName> targets,
 				MainJarManager resource) {
-			return new RelocatableClassPathUnit(targets, resource);
+			return new RelocatablesClassPathUnit(targets, resource);
 		}
 
 		@Override
@@ -600,9 +609,9 @@ public class DivisionExecutor {
 			return authorizedNames.get(authorizedNameForMe);
 		}
 
-		private RelocatableClassPathUnit.RelocatableClass forSingleClass(
+		private RelocatablesClassPathUnit.Relocatable forSingleClass(
 				FragmentName clazz) {
-			return new RelocatableClass(clazz);
+			return new Relocatable(clazz);
 		}
 
 
@@ -614,21 +623,16 @@ public class DivisionExecutor {
 
 
 
-		class RelocatableClass extends DivisionExecutor.FragmentUnit
+		class Relocatable extends DivisionExecutor.FragmentUnit
 				implements ArtifactFragment.RelocatableFragment {
 
-			private RelocatableClass(FragmentName myclazzset) {
-				super(myclazzset, ReportSortOrder.RO3_ClazzSet);
+			private Relocatable(FragmentName myclazzset) {
+				super(myclazzset, ReportSortOrder.RO3_RELOCATABLE);
 			}
 
-			private FragmentName getClazz() {
-				return getMyName();
-			}
-
-			@Override
-			public String toString() {
-				return "RelocatableClass [getClazz()=" + getClazz() + "]";
-			}
+//			private FragmentRef getName() {
+//				return getMyName();
+//			}
 
 			@Override
 			public Set<MyFragment> dependencyTargets(AuthorizedNameResolver r) {
@@ -636,9 +640,16 @@ public class DivisionExecutor {
 						r);
 			}
 
+
+
+			@Override
+			public String toString() {
+				return  Relocatable.class.getSimpleName() +  " [" + getMyName() + "]";
+			}
+
 			@Override
 			public Set<FragmentName> getDependencyTargetNames() {
-				return naturalDepedencyTargets(super.getMyName());
+				return naturalDepedencyTargets(getMyName());
 			}
 
 		}
@@ -654,18 +665,19 @@ public class DivisionExecutor {
 	public static abstract class SubArtifactRoot
 			extends DivisionExecutor.FragmentSet implements
 			ArtifactFragment.OutputArtifact, PartialNameResolver.Standard {
-		protected final SubArtifact submodule;
+		protected final SubArtifact artifactDefinition;
 
 		protected SubArtifactRoot(SubArtifact submodule
 		// , Set<FragmentName> myclazzes, Supplier<Set<FragmentName>> deps
 		) {
 			super(/* myclazzes , deps, */ ReportSortOrder.RO1_SUBMODULE);
-			this.submodule = submodule;
+			this.artifactDefinition = submodule;
 		}
 
 		@Override
 		public String toString() {
-			return "SubArtifactRoot [submodule=" + submodule + "]";
+			return artifactDefinition.toString();
+//			return "SubArtifactRoot [" + artifactDefinition + "]";
 		}
 
 		// public static SubArtifactRoot.LessMemory forLessMemory(SubArtifact
@@ -676,13 +688,22 @@ public class DivisionExecutor {
 
 		public static SubArtifactRoot.DetailTrace forDetailTrace(
 				SubArtifact submodule,
-				MainJarManager resource) {
+				MainJarManager resource,
+				OptionalPropagation[] outerDefaultRootTranstivePropagations,
+				OptionalPropagation[] outerDefaultRootReferencePropagations,
+				OptionalPropagation[] outerDefaultSubartifactReferencePropagations
+				) {
 			
 			Set<FragmentName> marked =
 			resource
 			.newMarker()
-			.mark(submodule.getRootMarks(), submodule.getDefaultPropagateOptions())
-			.commitMark();
+			.mark(submodule.getRootMarks(),
+					submodule.getDefaultRootTransitivePropagations(outerDefaultRootTranstivePropagations)
+					,
+					submodule.getDefaultRootSourceReferencePropagations(outerDefaultRootReferencePropagations)
+					)
+			.commitAndCut(
+					submodule.getSubartifactSourceReferencePropagations(outerDefaultSubartifactReferencePropagations ));
 			
 			
 			return new DetailTrace(submodule, marked, resource);
@@ -711,7 +732,7 @@ public class DivisionExecutor {
 
 		static class DetailTrace extends DivisionExecutor.SubArtifactRoot
 				implements PartialNameResolver.Standard.Resourced {
-			private final Map<FragmentName, SubArtifactRootFragment> authorizedContainingFraments;
+			private final Map<FragmentName, Root> authorizedContainingFraments;
 			private final MainJarManager jarmanager;
 
 			@Override
@@ -757,7 +778,7 @@ public class DivisionExecutor {
 				this.jarmanager = jarmanager;
 				this.authorizedContainingFraments = Maps.newHashMap(
 						Maps.transformEntries(MapsIID.forSet(myclazzes),
-								(clx, vd) -> new SubArtifactRootFragment(clx)));
+								(clx, vd) -> new Root(clx)));
 
 			}
 
@@ -769,14 +790,14 @@ public class DivisionExecutor {
 			// extraDB.put(m, this);
 			// }
 
-			public class SubArtifactRootFragment extends
+			public class Root extends
 					DivisionExecutor.FragmentUnit implements DebugContractable {
-				private SubArtifactRootFragment(FragmentName name) {
+				private Root(FragmentName name) {
 					super(name, ReportSortOrder.RO5_DEBUG);
 				}
 
-				private SubArtifactDefinition getMod() {
-					return DetailTrace.this.submodule;
+				private SubArtifactDefinition getSubArtifact() {
+					return DetailTrace.this.artifactDefinition;
 				}
 
 				private FragmentName getName() {
@@ -785,8 +806,8 @@ public class DivisionExecutor {
 
 				@Override
 				public String toString() {
-					return "SubArtifactRootFragment [getName()=" + getName()
-							+ ", getMod()=" + getMod() + "]";
+					return Root.class.getSimpleName() +  " [" + getName()
+							+ " of " + getSubArtifact() + "]";
 				}
 
 				@Override
@@ -827,7 +848,7 @@ public class DivisionExecutor {
 
 		@Override
 		public String toString() {
-			return "LibJAR [jarFile=" + jarFile.getName() + "]";
+			return  LibArtifact.class.getSimpleName()  +  " [" + pomDependency.toString() + "]";
 		}
 
 		// @Override
@@ -866,7 +887,7 @@ public class DivisionExecutor {
 		// implements PartialNameResolver.HasExtraDependencies
 		{
 
-			private Map<FragmentName, LibClass> apiClass = Maps.newConcurrentMap();
+			private Map<FragmentName, LibReferencee> apiClass = Maps.newConcurrentMap();
 
 			protected DetailTrace(File jarFile,
 					Set<FragmentName> autorhizedNames, Dependency dep) {
@@ -877,7 +898,7 @@ public class DivisionExecutor {
 			public DivisionExecutor.FragmentParty resolveOne(
 					FragmentName myclz) {
 				return apiClass.computeIfAbsent(myclz,
-						(c) -> new LibClass(c, ReportSortOrder.RO5_DEBUG)
+						(c) -> new LibReferencee(c, ReportSortOrder.RO5_DEBUG)
 						);
 			}
 
@@ -902,22 +923,26 @@ public class DivisionExecutor {
 			// return apiClass.keySet();
 			// }
 
-			public class LibClass extends DivisionExecutor.FragmentUnit
+			public class LibReferencee extends DivisionExecutor.FragmentUnit
 					implements DebugContractable {
 
-				protected LibClass(FragmentName myclazz,
+				protected LibReferencee(FragmentName myclazz,
 						DivisionExecutor.ReportSortOrder ro) {
 					super(myclazz, ro);
 				}
 
+				private FragmentName getName() {
+					return super.getMyName();
+				}
+				
 				private String getLibname() {
 					return DetailTrace.this.jarFile.getName();
 				}
 
 				@Override
 				public String toString() {
-					return "LibClass [getClazz()=" + getMyName()
-							+ ", getLibname()=" + getLibname() + "]";
+					return LibReferencee.class.getSimpleName() +  " [" + getName()
+							+ " of " + getLibname() + "]";
 				}
 
 				@Override
@@ -977,18 +1002,19 @@ public class DivisionExecutor {
 		private final SubArtifactDefinition target;
 		private final List<SubArtifactDefinition> subartDeps;
 		private final LinkedHashMap<File, Dependency> jarDeps;
-		private final List<String> deployClassNames;
+//		private final List<String> deployClassNames;
 		private final List<String> resources;
 
 		protected SubArtifactDeployment(SubArtifactDefinition target,
 				List<SubArtifactDefinition> subartDeps,
 				LinkedHashMap<File, Dependency> jarDeps,
-				List<String> deployClassNames, List<String> resources) {
+//				List<String> deployClassNames,
+				List<String> resources) {
 			super();
 			this.target = target;
 			this.subartDeps = subartDeps;
 			this.jarDeps = jarDeps;
-			this.deployClassNames = deployClassNames;
+//			this.deployClassNames = deployClassNames;
 			this.resources = resources;
 		}
 
@@ -1004,9 +1030,9 @@ public class DivisionExecutor {
 			return jarDeps;
 		}
 
-		public List<String> getDeployClassNames() {
-			return deployClassNames;
-		}
+//		public List<String> getDeployClassNames() {
+//			return deployClassNames;
+//		}
 
 		public List<String> getResources() {
 			return resources;
@@ -1035,15 +1061,13 @@ public class DivisionExecutor {
 						List<DeploymentUnit> list_of_deployee = ent.getValue();
 
 						System.out.println(
-								"Sub-Artifact Deployment Description For : "
+								"Sub-Artifact Deployment Description : "
 										+ deployAnchor.toString());
 						if (deployAnchor instanceof DivisionExecutor.SubArtifactRoot) {
 							DivisionExecutor.SubArtifactRoot submod = (DivisionExecutor.SubArtifactRoot) deployAnchor;
 							submod.getRootMemberNames().stream().sorted()
 									.forEach((c) -> {
-								System.out
-										.println("    Sub-Artifact Root Class: "
-												+ c.getAddressName());
+								System.out.println("  **Sub-Artifact Root : " + c.toString());
 							});
 
 						}
@@ -1203,7 +1227,7 @@ public class DivisionExecutor {
 				LinkedHashMap<File, Dependency> jardeps = Maps
 						.newLinkedHashMap();
 				List<SubArtifactDefinition> subart_deps = Lists.newArrayList();
-				List<String> deploy_classnames = Lists.newArrayList();
+				List<String> deployResources = Lists.newArrayList();
 
 				for (DeploymentUnit du : a.getValue()) {
 					ArtifactFragment tgt = du.deployeeFragment;
@@ -1213,15 +1237,15 @@ public class DivisionExecutor {
 					} else if (emptyOmitSet.contains(tgt)) {
 						info("{} is filterd out from {} because it's 'empty'.",
 								tgt, main);
-					} else if (tgt instanceof RelocatableClass) {
-						RelocatableClass fc = (RelocatableClass) tgt;
-						deploy_classnames.add(fc.getClazz().getAddressName());
+					} else if (tgt instanceof Relocatable) {
+						Relocatable fc = (Relocatable) tgt;
+						deployResources.add(fc.getMyName().getResName());
 					} else if (tgt instanceof LibArtifact) {
 						LibArtifact la = (LibArtifact) tgt;
 						jardeps.put(la.jarFile, la.pomDependency);
 					} else if (tgt instanceof SubArtifactRoot) {
 						SubArtifactRoot sa = (SubArtifactRoot) tgt;
-						subart_deps.add(sa.submodule);
+						subart_deps.add(sa.artifactDefinition);
 					} else {
 						throw new RuntimeException(
 								"unknown artifact fragment:" + tgt);
@@ -1229,10 +1253,10 @@ public class DivisionExecutor {
 				}
 
 				for (FragmentName rootCls : main.getRootMemberNames())
-					deploy_classnames.add(rootCls.getAddressName());
+					deployResources.add(rootCls.getResName());
 
 				boolean fullEmpty = jardeps.isEmpty() && subart_deps.isEmpty()
-						&& deploy_classnames.isEmpty();
+						&& deployResources.isEmpty();
 
 				if (fullEmpty /* && main.submodule.isOmittableIfEmpty() */ ) {
 					info("The artifact {} is not deployed because it's fully 'empty'.",
@@ -1241,8 +1265,8 @@ public class DivisionExecutor {
 				} else {
 					List<String> resources = Lists.newArrayList();
 					SubArtifactDeployment sa = new SubArtifactDeployment(
-							main.submodule, subart_deps, jardeps,
-							deploy_classnames, resources);
+							main.artifactDefinition, subart_deps, jardeps,
+							deployResources);
 					l.add(sa);
 				}
 			}
@@ -1311,56 +1335,69 @@ public class DivisionExecutor {
 			return leftNames;
 		}
 		
-		public RootMarker newMarker(){
-			return new RootMarker();
+		public SubsetMarker newMarker(){
+			return new SubsetMarker();
 		}
 		
-		public class RootMarker{
-			private Set<FragmentName> currentMarked = Sets.newHashSet();
+		public class SubsetMarker{
+			private Set<FragmentName> currentRoot = Sets.newHashSet();
 			
-			public Set<FragmentName> commitMark(){
-				return getAndCutByName( currentMarked ).keySet();
+			public Set<FragmentName> commitAndCut(
+					OptionalPropagation[] forSubsetSourceReference ){
+				
+		 		addAllPropagatedReferences(
+		 				computePropagatedReferencesExpandingRootSubeffectively(
+		 						currentRoot, null, forSubsetSourceReference)
+		 				);
+		 		
+				return getAndCutByName( currentRoot ).keySet();
 			}
 			
 
 
 
 
-			public RootMarker mark( 
-					RootMark[] markORs , OptionalPropagation[] defaultProp  ){
+			public SubsetMarker mark( 
+					RootMark[] markORs, OptionalPropagation[] externalRootTransitives, 
+					OptionalPropagation[] externalReferences ){
 				if ( markORs == null ) return this;
-				for ( RootMark r : markORs )
-					mark(r, defaultProp );
+				
+//				while(true) {
+//					int os = currentRoot.size();
+					for ( RootMark r : markORs )
+						mark(r
+								, r.getRootTransitivePropagations( externalRootTransitives )
+								, r.getRootSourceReferencePropagations( externalReferences ));
+//					int ns = currentRoot.size();
+//					if ( os == ns ) break;
+//				}
 				return this;
 			}
 			
 
 			
-			public RootMarker mark( 
-					RootMark mark, OptionalPropagation[] defaultProp  ){
-				Set<FragmentName> roots = Sets.newHashSet();
+			private SubsetMarker mark( 
+					RootMark mark, OptionalPropagation[] forRootTransitive , OptionalPropagation[] forSourceReference ){
+				Set<FragmentName> rootsExpanding = Sets.newHashSet();
 				if ( mark.getByAnnotation() != null ){
-					roots.addAll( getAnnotated( Arrays.asList( mark.getByAnnotation() ) ) );
+					rootsExpanding.addAll( getAnnotated( Arrays.asList( mark.getByAnnotation() ) ) );
 //					markAnnotated( Arrays.asList( mark.getByAnnotation() ));
 				}
 				
-				if ( mark.getByIncludeResourcePatterns() != null ){
-					for ( String incpat : mark.getByIncludeResourcePatterns() ){
-						currentMarked.addAll(getIncludePatternMatched(incpat));
-					}
+				if ( mark.getByIncludeResourcePattern() != null ){
+					String incpat = mark.getByIncludeResourcePattern();
+					rootsExpanding.addAll(getIncludePatternMatched(incpat));
 				}
 				
-				OptionalPropagation[] x = mark.getOptionalPropagations();
-				if ( mark.inheritsDefaultOptionalPropagations() ){
-					x = ArrayUtils.<OptionalPropagation>addAll(x, defaultProp);
-				}
+				Multimap<FragmentName, FragmentName> refs = 
+				computePropagatedReferencesExpandingRootSubeffectively(
+						rootsExpanding
+						, forRootTransitive
+						, forSourceReference
+						);
 				
-				Multimap<FragmentName, FragmentName> marks = 
-				MainJarManager.this.
-				propagateOptionally(roots, x);
-				
-				currentMarked.addAll(roots);
-				currentMarked.addAll(marks.values());
+				currentRoot.addAll(rootsExpanding);
+				addAllPropagatedReferences(refs);
 				
 				return this;
 			}
@@ -1387,7 +1424,7 @@ public class DivisionExecutor {
 			Set<FragmentName> m =
 					index.annotatedClasses(l)
 					.map( (x) -> index.getFragmentName(x) )
-					.flatMap( (x) -> expandMarkResourcesToIncludeInnerClassRelations(x) )
+					.flatMap( (x) -> propagateInnerClassReferencesWhenTopLeveClass(x) )
 					.collect(Collectors.toSet())
 					;
 			return m;
@@ -1397,17 +1434,17 @@ public class DivisionExecutor {
 			return Sets.filter(
 					index.getEntries().keySet()
 					,
-					(f) -> SelectorUtils.match(incpat, f.getAddressName() , false) );
+					(f) -> SelectorUtils.match(incpat, f.getResName() , false) );
 		}
 		
-		private Stream<FragmentName>  expandMarkResourcesToIncludeInnerClassRelations(
+		private Stream<FragmentName>  propagateInnerClassReferencesWhenTopLeveClass(
 				FragmentName classfile ) {
 			if ( !classfile.isClassFileResource() )
 				return Stream.of(classfile);
 			if ( ! DetailJarAnalysis.isToplevelClass(index.getEntry(classfile)) )
 				return Stream.of(classfile);
 				
-			ClassNode markstcn = index.getClassNode(classfile.getAddressName()).get();
+			ClassNode markstcn = index.getClassNode(classfile).get();
 
 			return TraversersV0
 					.stackTraverse(
@@ -1430,55 +1467,80 @@ public class DivisionExecutor {
 			return index.packageResource(packagename).keySet();
 		}
 	 	
-	 	public void buildOptionalRelation(
-	 			OptionalPropagation[] markPropagateOptions
+	 	void addAllPropagatedReferences(
+	 			Multimap<FragmentName, FragmentName> m ){
+	 		extraMarkRelations.putAll(
+	 				Multimaps.filterEntries(
+	 						m
+	 						, (k2v) -> k2v.getKey() != k2v.getValue() )
+	 				);
+	 	}
+	 	public void propagateGlobalReference(
+	 			OptionalPropagation[] forGlobalReference
 	 			){
-	 		HashSet<FragmentName> fullNameSet = 
+	 		HashSet<FragmentName> globalSet = 
 	 				Sets.newHashSet(
 	 						index.getEntries().keySet()
 	 						);
 	 		
-	 		
-	 		extraMarkRelations.putAll(
-	 				Multimaps.filterEntries(
-	 						propagateOptionally(
-	 								fullNameSet
-	 								, markPropagateOptions
-	 								)
-	 						, (k2v) -> k2v.getKey() != k2v.getValue() )
-	 				);
+	 		addAllPropagatedReferences(
+	 				computePropagatedReferencesExpandingRootSubeffectively( globalSet , null, forGlobalReference ) );
 	 	}
 	 	
-		private Multimap<FragmentName, FragmentName> propagateOptionally(
-				Set<FragmentName> markOrigin,
-				OptionalPropagation[] markPropagateOptions) {
-			Multimap<FragmentName, FragmentName> markExtend =  HashMultimap.create(
-					Multimaps.forMap( Maps.asMap(markOrigin, Functions.identity()) ));
+		private Multimap<FragmentName, FragmentName> computePropagatedReferencesExpandingRootSubeffectively(
+				Set<FragmentName> rootSubeffectivelyExpanding,
+				OptionalPropagation[] forRootTransitive,
+				OptionalPropagation[] forRootSourceReference
+				) {
 			
-			if ( markPropagateOptions == null )
-				return markExtend;
+			if ( forRootTransitive == null )
+				forRootTransitive = new OptionalPropagation[0];
+			if ( forRootSourceReference == null )
+				forRootSourceReference = new OptionalPropagation[0];
 			
 			
-			Set<FragmentName> rootOrig = Sets.newHashSet(markOrigin);
-			
-			for ( int preexe = -1, afterexe = markExtend.size(); preexe != afterexe; preexe = markExtend.size() ){
-				for ( OptionalPropagation r : markPropagateOptions )
-					propagateOptionallyPrivate( rootOrig, r,  markExtend);
-				afterexe = markExtend.size();
+			//initially propagate roots
+			while( true ){
+				int os = rootSubeffectivelyExpanding.size();
+				
+				Multimap<FragmentName, FragmentName> rootExtension =  HashMultimap.create();
+				for ( OptionalPropagation r : forRootTransitive ){
+					propagateOptionallyPrivate(
+							Collections.unmodifiableSet( rootSubeffectivelyExpanding )
+							, r,  rootExtension);
+				}
+				//subeffectively expand the root.
+				rootSubeffectivelyExpanding.addAll(rootExtension.values());
+				
+				int ns = rootSubeffectivelyExpanding.size();
+				if ( os == ns ) break;
 			}
 			
-			return markExtend;
+			Set<FragmentName> rootFixed = rootSubeffectivelyExpanding;
+			
+			//then propagate references
+			{
+				Multimap<FragmentName, FragmentName> references =  HashMultimap.create();
+				for ( OptionalPropagation r : forRootSourceReference ){
+					propagateOptionallyPrivate(
+							Collections.unmodifiableSet( rootFixed )
+							, r,  references );
+				}
+				return references;
+			}
+			
 		}
 		private void propagateOptionallyPrivate(
 				Set<FragmentName> markOrigin,
 				OptionalPropagation markPropagateOptionO,
 				Multimap<FragmentName, FragmentName> seen
+//				, boolean transitivePropagate
 				) {
 			
 			OptionalPropagation markPropagateOption;
 			
-			if ( markPropagateOptionO.getUsePredefined() != null )
-				markPropagateOption = markPropagateOptionO.getUsePredefined().getAsOption();
+			if ( markPropagateOptionO.getByPredefined() != null )
+				markPropagateOption = markPropagateOptionO.getByPredefined().getAsOption();
 			else
 				markPropagateOption = markPropagateOptionO;
 			
@@ -1487,7 +1549,7 @@ public class DivisionExecutor {
 			
 			if ( markPropagateOption.isByInnerClassSignature() ){
 				for ( FragmentName o : markOrigin ){
-					myexapnd.putAll(o, expandMarkResourcesToIncludeInnerClassRelations(o).collect(Collectors.toSet()) );
+					myexapnd.putAll(o, propagateInnerClassReferencesWhenTopLeveClass(o).collect(Collectors.toSet()) );
 				}
 			}
 			
@@ -1537,9 +1599,9 @@ public class DivisionExecutor {
 			
 			seen.putAll(myexapnd);
 			
-			if (  markPropagateOption.isTransitvePropagate() ){
-				markOrigin.addAll(myexapnd.values());
-			}
+//			if ( transitivePropagate ){
+//				markOrigin.addAll(myexapnd.values());
+//			}
 			
 		}
 
