@@ -2,6 +2,7 @@ package jp.co.iidev.subartifact1.divider1;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -10,22 +11,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
-import java.util.jar.JarInputStream;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.model.Dependency;
+import org.codehaus.plexus.util.SelectorUtils;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InnerClassNode;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -34,11 +35,12 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
+import com.google.common.io.CharStreams;
 
 //import javassist.ClassPool;
 //import javassist.CtClass;
@@ -49,9 +51,10 @@ import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanAcceptor;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.AFPredicateInconsitency;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.PlanningException.CyclicArtifact;
 import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ReferenceInspector;
-import jp.co.iidev.subartifact1.divider1.DivisionExecutor.MainJarManager;
 import jp.co.iidev.subartifact1.divider1.DivisionExecutor.RelocatableClassPathUnit.RelocatableClass;
 import jp.co.iidev.subartifact1.divider1.JARIndex.MyJarEntry;
+import jp.co.iidev.subartifact1.divider1.mojo.OptionalPropagation;
+import jp.co.iidev.subartifact1.divider1.mojo.RootMark;
 import jp.co.iidev.subartifact1.divider1.mojo.SubArtifact;
 
 public class DivisionExecutor {
@@ -93,10 +96,12 @@ public class DivisionExecutor {
 	// }
 
 	public LinkedHashMap<SubArtifactDefinition, SubArtifactDeployment> planDivision(
-			Loggable log, File targetJarInClasspath, String rootSubartifactId,
+			File targetJarInClasspath, String rootSubartifactId,
 			Iterable<? extends SubArtifact> subartifactsInTargetJar,
 			LinkedHashMap<File, Dependency> compiletimeClasspath,
-			Predicate<File> outputClasspathAliveFilter, LoggableFactory lgf)
+			Predicate<File> outputClasspathAliveFilter,
+			OptionalPropagation[] genericPropagateOptions,
+			LoggableFactory lgf)
 					throws CyclicArtifact, AFPredicateInconsitency {
 		// ClassPool loader = new ClassPool(false);
 		// for (File jf : compiletimeClasspath.keySet())
@@ -130,13 +135,15 @@ public class DivisionExecutor {
 
 		MainJarManager pc = new MainJarManager(
 				new DetailJarAnalysis(jindexCache.getUnchecked(mainjar)));
+		pc.buildOptionalRelation(genericPropagateOptions);
+		
 
 		SubArtifact rootSubart;
 		{
 			rootSubart = new SubArtifact();
 			rootSubart.setArtifactId(rootSubartifactId);
 			rootSubart.setExtraDependencies(new Dependency[0]);
-			rootSubart.setRootClassAnnotations(Sets.newHashSet());
+			rootSubart.setRootMarks(new RootMark[0]);
 			// rootSubart.setOmittableIfEmpty(true);
 		}
 
@@ -146,11 +153,9 @@ public class DivisionExecutor {
 						.ofConcat(
 								Arrays.asList(rootSubart)
 								, subartifactsInTargetJar)
-						.transform((jm) -> SubArtifactRoot.forDetailTrace(
+						.transform((jm) ->
+						SubArtifactRoot.forDetailTrace(
 								jm
-								,
-								pc.getAndCutKeepClazzesAndResources(
-										jm.getRootClassAnnotations())
 								,
 								pc
 								)));
@@ -439,7 +444,7 @@ public class DivisionExecutor {
 		private final List<DivisionExecutor.PartialNameResolver> partialResolvers;
 		// private final Multimap<ArtifactFragment, ArtifactFragment>
 		// extractAdjacent = HashMultimap.create();
-		private final Map<FragmentName, DivisionExecutor.FragmentParty> resolvCache = Maps
+		private final Map<FragmentName, FragmentParty> resolvCache = Maps
 				.newHashMap();
 
 		protected MyClazzpath(
@@ -670,9 +675,17 @@ public class DivisionExecutor {
 		// }
 
 		public static SubArtifactRoot.DetailTrace forDetailTrace(
-				SubArtifact submodule, Set<FragmentName> myclazzes,
+				SubArtifact submodule,
 				MainJarManager resource) {
-			return new DetailTrace(submodule, myclazzes, resource);
+			
+			Set<FragmentName> marked =
+			resource
+			.newMarker()
+			.mark(submodule.getRootMarks(), submodule.getDefaultPropagateOptions())
+			.commitMark();
+			
+			
+			return new DetailTrace(submodule, marked, resource);
 		}
 
 		// public static class LessMemory extends
@@ -1245,7 +1258,7 @@ public class DivisionExecutor {
 	}
 
 	// helper class
-	static class MainJarManager {
+	class MainJarManager {
 		// final ClassPool pool;
 		// final Set<Clazz> searchSpace;
 		// final Multimap<String, Clazz> annotatedClazzes =
@@ -1253,86 +1266,283 @@ public class DivisionExecutor {
 		// final Multimap<String, Clazz> toplevelClazzesByPackage =
 		// LinkedListMultimap.create();
 		// final BiMap<Clazz, CtClass> classMap;
-		final DetailJarAnalysis jidx;
+		final DetailJarAnalysis index;
 		BiMap<FragmentName, MyJarEntry> leftNames;
+		HashMultimap<FragmentName, FragmentName> extraMarkRelations = HashMultimap.create();
 
 		MainJarManager(DetailJarAnalysis jidx) {
 			super();
-			this.jidx = jidx;
+			this.index = jidx;
 			this.leftNames = jidx.getEntries();
 		}
 
-		private Map<FragmentName, MyJarEntry> getAndCut(Set<MyJarEntry> annotnames) {
-			Map<FragmentName, MyJarEntry> jx = Maps.filterValues(leftNames, Predicates.in(annotnames));
-			this.leftNames = Maps.filterValues(leftNames, Predicates.not( Predicates.in(annotnames) ));
+		private Map<FragmentName, MyJarEntry> getAndCutByName(Set<FragmentName> annotnames) {
+			Map<FragmentName, MyJarEntry> jx = Maps.filterKeys(leftNames, Predicates.in(annotnames));
+			this.leftNames = Maps.filterKeys(leftNames, Predicates.not( Predicates.in(annotnames) ));
 			return jx;
 		}
-		
+//		private Map<FragmentName, MyJarEntry> getAndCut(Set<MyJarEntry> annotnames) {
+//			Map<FragmentName, MyJarEntry> jx = Maps.filterValues(leftNames, Predicates.in(annotnames));
+//			this.leftNames = Maps.filterValues(leftNames, Predicates.not( Predicates.in(annotnames) ));
+//			return jx;
+//		}
+//		
 		public Set<FragmentName> getExternallyDependentNames(){
 			return
-			jidx.getEntries().keySet().stream()//.parallel()
+			index.getEntries().keySet().stream()//.parallel()
 			.flatMap((e) -> getDependentNames(e).stream())
-			.filter( (e) -> !jidx.getEntries().containsKey(e))
+			.filter( (e) -> !index.getEntries().containsKey(e))
 			.collect(Collectors.toSet());
 		}
 		
 		public Set<FragmentName> getDependentNames( FragmentName fn ){
-			return jidx.getDependency(fn);
+			if ( extraMarkRelations.containsKey(fn) ){
+				return Sets.union(
+								index.getDependency(fn)
+								,
+								extraMarkRelations.get(fn)
+								)
+								;
+			}
+			return index.getDependency(fn);
 		}
 		
 		public  Map<FragmentName, MyJarEntry>  getLeftAll() {
 			return leftNames;
 		}
+		
+		public RootMarker newMarker(){
+			return new RootMarker();
+		}
+		
+		public class RootMarker{
+			private Set<FragmentName> currentMarked = Sets.newHashSet();
+			
+			public Set<FragmentName> commitMark(){
+				return getAndCutByName( currentMarked ).keySet();
+			}
+			
 
-		public  Set<FragmentName>  getAndCutKeepClazzesAndResources(
+
+
+
+			public RootMarker mark( 
+					RootMark[] markORs , OptionalPropagation[] defaultProp  ){
+				if ( markORs == null ) return this;
+				for ( RootMark r : markORs )
+					mark(r, defaultProp );
+				return this;
+			}
+			
+
+			
+			public RootMarker mark( 
+					RootMark mark, OptionalPropagation[] defaultProp  ){
+				Set<FragmentName> roots = Sets.newHashSet();
+				if ( mark.getByAnnotation() != null ){
+					roots.addAll( getAnnotated( Arrays.asList( mark.getByAnnotation() ) ) );
+//					markAnnotated( Arrays.asList( mark.getByAnnotation() ));
+				}
+				
+				if ( mark.getByIncludeResourcePatterns() != null ){
+					for ( String incpat : mark.getByIncludeResourcePatterns() ){
+						currentMarked.addAll(getIncludePatternMatched(incpat));
+					}
+				}
+				
+				OptionalPropagation[] x = mark.getOptionalPropagations();
+				if ( mark.inheritsDefaultOptionalPropagations() ){
+					x = ArrayUtils.<OptionalPropagation>addAll(x, defaultProp);
+				}
+				
+				Multimap<FragmentName, FragmentName> marks = 
+				MainJarManager.this.
+				propagateOptionally(roots, x);
+				
+				currentMarked.addAll(roots);
+				currentMarked.addAll(marks.values());
+				
+				return this;
+			}
+			
+
+
+
+//			public RootMarker propagateOptionally(
+//					OptionalPropagation[] markPropagateOptions) {
+//				currentMarked.addAll(
+//						MainJarManager.this.
+//						propagateOptionally(currentMarked, markPropagateOptions).values() );
+//				return this;
+//			}
+
+		}
+		
+		public Set<FragmentName>  getAnnotated(
 				Iterable<? extends String> annotnames) {
-			List<? extends String> l = Lists.newArrayList(annotnames);
+			Set<String> l = Sets.newHashSet(annotnames);
 			if (l.size() == 0)
 				return Sets.newHashSet();// empty
 
-			return getAndCut(jidx.annotatedClasses(Sets.newHashSet(annotnames))
-					.flatMap((ancls) -> {
-						// boolean topcls = isToplevelClass(ancls);
-						boolean packdecl = DetailJarAnalysis.isPackageDeclaration(ancls);
-
-						Stream<MyJarEntry> innerMarkStart = Stream.of(ancls);
-						if (packdecl) {
-							innerMarkStart = jidx.groupByPackage()
-									.get(ancls.getDiretoryPathAlikePackage("."))
-									.values()
-									.stream()
-									//toplevel class or resource only (= top level resource only)
-									.filter((m) -> DetailJarAnalysis.isToplevelClass(m) || !m.isClassFile());
-						}
-
-						return innerMarkStart.flatMap((ent) -> {
-							if (!DetailJarAnalysis.isToplevelClass(ent))
-								return Stream.of(ent);
-
-							if (!ent.isClassFile()) {
-								return Stream.of(ent);
-							}
-
-							// mark inner class
-							ClassNode markstcn = jidx.getClassNode(ent).get();
-
-							return TraversersV0
-									.stackTraverse(
-											markstcn,
-											(cx) ->
-												((List<InnerClassNode>) cx.innerClasses)
-												.stream()
-												.map((icn) -> jidx.getClassNode(icn.name).get())
-												.collect(Collectors.toList()),
-											Collectors.toSet()
-											).stream()
-									.map((cn) -> jidx.getEntry(FragmentName
-											.forClassName(cn.name)));
-						});
-
-					}).collect(Collectors.toSet())).keySet();
-
+			Set<FragmentName> m =
+					index.annotatedClasses(l)
+					.map( (x) -> index.getFragmentName(x) )
+					.flatMap( (x) -> expandMarkResourcesToIncludeInnerClassRelations(x) )
+					.collect(Collectors.toSet())
+					;
+			return m;
 		}
+		
+		private Set<FragmentName> getIncludePatternMatched(String incpat) {
+			return Sets.filter(
+					index.getEntries().keySet()
+					,
+					(f) -> SelectorUtils.match(incpat, f.getAddressName() , false) );
+		}
+		
+		private Stream<FragmentName>  expandMarkResourcesToIncludeInnerClassRelations(
+				FragmentName classfile ) {
+			if ( !classfile.isClassFileResource() )
+				return Stream.of(classfile);
+			if ( ! DetailJarAnalysis.isToplevelClass(index.getEntry(classfile)) )
+				return Stream.of(classfile);
+				
+			ClassNode markstcn = index.getClassNode(classfile.getAddressName()).get();
+
+			return TraversersV0
+					.stackTraverse(
+							markstcn,
+							(cx) ->
+								((List<InnerClassNode>) cx.innerClasses)
+								.stream()
+								.map((icn) -> index.getClassNode(icn.name).get())
+								.collect(Collectors.toList()),
+							Collectors.toSet()
+							).stream()
+					.map((cn) -> FragmentName.forClassName(cn.name))
+//					.collect(Collectors.toSet())
+					;
+		}
+		
+	 	public Set<FragmentName> getPackageResources(
+				FragmentName classfile ) {
+			String packagename = index.getEntry(classfile).getDiretoryPathAlikePackage(".");
+			return index.packageResource(packagename).keySet();
+		}
+	 	
+	 	public void buildOptionalRelation(
+	 			OptionalPropagation[] markPropagateOptions
+	 			){
+	 		HashSet<FragmentName> fullNameSet = 
+	 				Sets.newHashSet(
+	 						index.getEntries().keySet()
+	 						);
+	 		
+	 		
+	 		extraMarkRelations.putAll(
+	 				Multimaps.filterEntries(
+	 						propagateOptionally(
+	 								fullNameSet
+	 								, markPropagateOptions
+	 								)
+	 						, (k2v) -> k2v.getKey() != k2v.getValue() )
+	 				);
+	 	}
+	 	
+		private Multimap<FragmentName, FragmentName> propagateOptionally(
+				Set<FragmentName> markOrigin,
+				OptionalPropagation[] markPropagateOptions) {
+			Multimap<FragmentName, FragmentName> markExtend =  HashMultimap.create(
+					Multimaps.forMap( Maps.asMap(markOrigin, Functions.identity()) ));
+			
+			if ( markPropagateOptions == null )
+				return markExtend;
+			
+			
+			Set<FragmentName> rootOrig = Sets.newHashSet(markOrigin);
+			
+			for ( int preexe = -1, afterexe = markExtend.size(); preexe != afterexe; preexe = markExtend.size() ){
+				for ( OptionalPropagation r : markPropagateOptions )
+					propagateOptionallyPrivate( rootOrig, r,  markExtend);
+				afterexe = markExtend.size();
+			}
+			
+			return markExtend;
+		}
+		private void propagateOptionallyPrivate(
+				Set<FragmentName> markOrigin,
+				OptionalPropagation markPropagateOptionO,
+				Multimap<FragmentName, FragmentName> seen
+				) {
+			
+			OptionalPropagation markPropagateOption;
+			
+			if ( markPropagateOptionO.getUsePredefined() != null )
+				markPropagateOption = markPropagateOptionO.getUsePredefined().getAsOption();
+			else
+				markPropagateOption = markPropagateOptionO;
+			
+			Multimap<FragmentName, FragmentName> myexapnd = 
+					HashMultimap.create();
+			
+			if ( markPropagateOption.isByInnerClassSignature() ){
+				for ( FragmentName o : markOrigin ){
+					myexapnd.putAll(o, expandMarkResourcesToIncludeInnerClassRelations(o).collect(Collectors.toSet()) );
+				}
+			}
+			
+			if ( markPropagateOption.isByServicesFileContents() ){
+				for ( FragmentName o : markOrigin ){
+					String contents = new String( index.getBytes(o), Charsets.UTF_8 );
+					try {
+						for ( String ln : CharStreams.readLines(new StringReader(contents)) ){
+							FragmentName fnx = FragmentName.forClassName(ln);
+							if (  !index.getEntries().containsKey(fnx) ){
+								error("The mark propagation of #isBySercieFileContents() from {} finds an unkonwn class {} in the jar.", o.toString(), ln);
+							}
+							myexapnd.put(o, fnx);
+						}
+					} catch (IOException e) {
+						throw new RuntimeException(e);
+					}
+				}
+			}
+			
+			{
+				String packageMarkerSimpleResource = null;
+				if ( markPropagateOption.getBySimpleClassNameInPacakge() != null ){
+					packageMarkerSimpleResource = markPropagateOption.getBySimpleClassNameInPacakge() + ".class";
+				}else if ( markPropagateOption.getBySimpleResourceNameInPacakge() != null ){
+					packageMarkerSimpleResource = markPropagateOption.getBySimpleResourceNameInPacakge();
+				}
+				
+				if ( packageMarkerSimpleResource != null ){
+					for ( FragmentName o : markOrigin ){
+						MyJarEntry m = index.getEntry(o);
+						if ( m.getBasename().equals(packageMarkerSimpleResource) ){
+							String markPackage = m.getDiretoryPathAlikePackage(".");
+							myexapnd.putAll(o, index.packageResource(markPackage).keySet() );
+						}
+					}
+				}
+			}
+			
+			myexapnd = 
+			Multimaps.filterValues(
+					myexapnd, 
+					(v) -> {
+						return markPropagateOption.getTargetResourceTypeOR().contains( index.getEntry(v).mapAsResourceType() );
+					} );
+			
+			
+			seen.putAll(myexapnd);
+			
+			if (  markPropagateOption.isTransitvePropagate() ){
+				markOrigin.addAll(myexapnd.values());
+			}
+			
+		}
+
 
 	}
 

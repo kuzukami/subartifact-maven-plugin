@@ -8,15 +8,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
-import org.sonatype.guice.bean.reflect.Streams;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicates;
+import com.google.common.base.Supplier;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -34,6 +33,9 @@ class DetailJarAnalysis {
 	private final LoadingCache<MyJarEntry, byte[]> binaryCache;
 	private final LoadingCache<MyJarEntry, ClassNode> classNodeCache;
 	private final LoadingCache<FragmentName, Set<FragmentName>> classDependencyCache;
+	private final Supplier<Map<String, Map<FragmentName, MyJarEntry>>> package2EntrynameIndexWhereRootPackageIsZeroLengthString;
+			
+
 
 	public DetailJarAnalysis( JARIndex jr ) {
 		this.index = jr;
@@ -61,20 +63,31 @@ class DetailJarAnalysis {
 						(e) -> {
 							if ( ! e.isClassFileResource() )
 								return Collections.emptySet();
-							byte[] classfile = binaryCache.getUnchecked(
-									index.getEntry(e.getAddressName())
-									);
+							byte[] classfile = getBytes( e );
 							
 							return
 							ResourceAnalysis.getDependentDistinctClassNamesAsFragmentName(classfile)
 							.toSet();
 						}));
-		
+		LoadingCache<String, Map<String, Map<FragmentName, MyJarEntry>>> x = 
+				CacheBuilder.newBuilder()
+				.softValues()
+				.build( CacheLoader.from(
+						(e) -> {
+							return groupByPackage();
+						}));
+		this.package2EntrynameIndexWhereRootPackageIsZeroLengthString =
+			() -> x.getUnchecked("anythingok");
 	}
 	
 	public Set<FragmentName> getDependency( FragmentName resource ){
 		return classDependencyCache.getUnchecked(resource);
 	}
+	
+	public byte[] getBytes(FragmentName o) {
+		return binaryCache.getUnchecked(getEntry(o));
+	}
+
 
 	public Stream<JARIndex.MyJarEntry> annotatedClasses(
 			Set<String> annotationClassName) {
@@ -83,6 +96,9 @@ class DetailJarAnalysis {
 				.map((an) -> JARIndex.fromObjectClassNameToCannonicalName(an) )
 				.collect(Collectors.toSet())
 				);
+	}
+	public FragmentName getFragmentName(MyJarEntry x) {
+		return getEntries().inverse().get(x);
 	}
 	
 	public MyJarEntry getEntry( String resourcePath ){
@@ -116,8 +132,12 @@ class DetailJarAnalysis {
 		});
 		return indx;
 	}
+	
+	public Map<FragmentName, MyJarEntry> packageResource( String packageName_sep_by_dot ) {
+		return package2EntrynameIndexWhereRootPackageIsZeroLengthString.get().get(packageName_sep_by_dot);
+	}
 
-	public Map<String, Map<FragmentName, MyJarEntry>> groupByPackage() {
+	private Map<String, Map<FragmentName, MyJarEntry>> groupByPackage() {
 		return
 		Maps.transformValues(
 				computePackage2EntrynameIndexWhereRootPackageIsZeroLengthString(".").asMap()
@@ -132,7 +152,7 @@ class DetailJarAnalysis {
 			Set<String> annotationJVMName) {
 		return index.getEntries().values()
 				.stream()
-//				.parallel()
+				.parallel()
 				.filter((e) -> {
 			Optional<ClassNode> cn = getClassNode(e);
 			if ( !cn.isPresent() ) return false;
@@ -165,8 +185,11 @@ class DetailJarAnalysis {
 		return c.isClassFile() && !c.getBasename().contains("$");
 	}
 
-	static boolean isPackageDeclaration(JARIndex.MyJarEntry c) {
-		return DetailJarAnalysis.isToplevelClass(c) && "package-info".equals(c.getBasename());
-	}
+
+//	static boolean isPackageDeclaration(JARIndex.MyJarEntry c) {
+//		return DetailJarAnalysis.isToplevelClass(c) && "package-info".equals(c.getBasename());
+//	}
+
+
 
 }

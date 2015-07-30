@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.Set;
 
+import jp.co.iidev.subartifact1.divider1.mojo.RootMark;
+
 
 
 public interface SubArtifactDefinition extends DependableArtifact{
@@ -13,7 +15,7 @@ public interface SubArtifactDefinition extends DependableArtifact{
 //	public abstract Set<ModuleDependency> getMergeDependenciesNotRecursively();
 //	public abstract Set<ModuleDependency> getExternalDependencies();
 	
-	public abstract Set<String> getRootClassAnnotations();
+	public abstract RootMark[] getRootMarks();
 //	public abstract String getSubModuleUniquePackage();
 //	public abstract String getSubModuleUniqueClassnamePrefix();
 	

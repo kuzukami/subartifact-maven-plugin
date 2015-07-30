@@ -30,6 +30,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 
+import jp.co.iidev.subartifact1.divider1.mojo.ResourceType;
+
 class JARIndex implements AutoCloseable{
 	private final JARHandle jarhandle;
 	private final BiMap<FragmentName, MyJarEntry> entries;
@@ -175,6 +177,16 @@ class JARIndex implements AutoCloseable{
 		
 		public String getDiretoryPathAlikePackage( String packageJoiner ){
 			return Joiner.on(packageJoiner).join(getDiretoryPath());
+		}
+		
+		public ResourceType mapAsResourceType(){
+			if ( isClassFile() ){
+				if ( DetailJarAnalysis.isToplevelClass(this) )
+					return ResourceType.TopLevelClass;
+				else
+					return ResourceType.InnerClass;
+			}
+			return ResourceType.Resource;
 		}
 		
 		private int getBasenameStartIndex(){

@@ -11,6 +11,13 @@ import com.google.common.collect.Sets;
 
 public class TraversersV0 {
 	
+	/**
+	 * 
+	 * @param start traverse start point which is included in the result.
+	 * @param next
+	 * @param collector
+	 * @return
+	 */
 	public static<T,A,R> R stackTraverse(
 			T start, Function<? super T,? extends Iterable<T>> next, Collector<T,A,R> collector ){
 		return stackTraverseL(Arrays.asList(start), next, collector);

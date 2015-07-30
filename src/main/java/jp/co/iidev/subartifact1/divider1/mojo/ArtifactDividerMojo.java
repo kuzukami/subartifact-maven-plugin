@@ -41,10 +41,7 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.thymeleaf.standard.expression.DivisionExpression;
 
-import com.google.common.base.Objects;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -94,35 +91,18 @@ public class ArtifactDividerMojo extends AbstractMojo {
 	 */
 	@Parameter(defaultValue= "${project.artifactId}-subarts-parent", property="divier.subArtifactsParentArtifactId", required = true )
 	private String subArtifactsParentArtifactId;
-	
-	/**
-	 * The resource inclusion rules of 'OR' chains for a sub-artifact.
-	 */
-	@Parameter
-	private PackageResourceInclusion[] packageResourceInclusionORs;
+
 	
 	/**
 	 * The sub-artifacts definitions to be created from the main artifact.
 	 */
 	@Parameter
-	private SubArtifact[] subartifacts;
+	private SubArtifact[] subartifacts = new SubArtifact[0];
 	
 	
-	static enum PackageResourceRule{
-		BySimpleClassNameRule
-		,
-		UnknownRule
-		;
-		
-		
-		static PackageResourceRule detect( PackageResourceInclusion r ){
-			if ( r.getBySimpleClassNameInPackage() != null )
-				return BySimpleClassNameRule;
-			return UnknownRule;
-		}
-	}
+	@Parameter
+	private OptionalPropagation[] genericPropagateOptions = new OptionalPropagation[0];
 	
-
 
 	public void execute() throws MojoExecutionException {
 
@@ -219,14 +199,14 @@ public class ArtifactDividerMojo extends AbstractMojo {
 				buildPlan =
 						new DivisionExecutor( lf.createLoggable(DivisionExecutor.class) )
 						.planDivision(
-								lf.createLoggable(DivisionExecutor.class)
-								, targetJar
+								targetJar
 								, rootSubArtifactId
 								, Arrays.asList(
 										subartifacts == null
 										? new SubArtifact[0] : subartifacts)
 								, compiletimeClasspath
 								, not(in(ImmutableSet.of( rtjar, targetJar )))
+								, genericPropagateOptions
 								, lf
 								);
 
