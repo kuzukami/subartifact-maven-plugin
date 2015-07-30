@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -25,6 +26,7 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
@@ -887,24 +889,26 @@ public class DivisionExecutor {
 		// implements PartialNameResolver.HasExtraDependencies
 		{
 
-			private Map<FragmentName, LibReferencee> apiClass = Maps.newConcurrentMap();
+			private Set<FragmentName> authorizedName;
+			private Map<FragmentName, LibReferencee> apiUsage = Maps.newConcurrentMap();
 
 			protected DetailTrace(File jarFile,
-					Set<FragmentName> autorhizedNames, Dependency dep) {
+					Set<FragmentName> authorizedNames, Dependency dep) {
 				super(jarFile, dep );
+				this.authorizedName = authorizedNames;
 			}
 
 			@Override
 			public DivisionExecutor.FragmentParty resolveOne(
 					FragmentName myclz) {
-				return apiClass.computeIfAbsent(myclz,
+				return apiUsage.computeIfAbsent(myclz,
 						(c) -> new LibReferencee(c, ReportSortOrder.RO5_DEBUG)
 						);
 			}
 
 			@Override
 			public Set<FragmentName> getDependencyTargetNames() {
-				return apiClass.keySet();
+				return authorizedName;
 			}
 
 			@Override
@@ -915,7 +919,7 @@ public class DivisionExecutor {
 
 			@Override
 			public Set<FragmentName> getAuthorizedNames() {
-				return apiClass.keySet();
+				return authorizedName;
 			}
 
 			// @Override
@@ -1424,7 +1428,7 @@ public class DivisionExecutor {
 			Set<FragmentName> m =
 					index.annotatedClasses(l)
 					.map( (x) -> index.getFragmentName(x) )
-					.flatMap( (x) -> propagateInnerClassReferencesWhenTopLeveClass(x) )
+					.flatMap( (x) -> propagateInnerClassReferencesInJarWhenTopLeveClass(x) )
 					.collect(Collectors.toSet())
 					;
 			return m;
@@ -1437,7 +1441,7 @@ public class DivisionExecutor {
 					(f) -> SelectorUtils.match(incpat, f.getResName() , false) );
 		}
 		
-		private Stream<FragmentName>  propagateInnerClassReferencesWhenTopLeveClass(
+		private Stream<FragmentName>  propagateInnerClassReferencesInJarWhenTopLeveClass(
 				FragmentName classfile ) {
 			if ( !classfile.isClassFileResource() )
 				return Stream.of(classfile);
@@ -1450,13 +1454,22 @@ public class DivisionExecutor {
 					.stackTraverse(
 							markstcn,
 							(cx) ->
-								((List<InnerClassNode>) cx.innerClasses)
+								ClassNodes.getNestCanonicalClassNames(cx)
 								.stream()
-								.map((icn) -> index.getClassNode(icn.name).get())
+								.flatMap((canClsnamOfNested) -> {
+									return index.getClassNode(FragmentName.forCanoicalClassName( canClsnamOfNested ))
+											.map(Stream::of)
+											.orElseGet(() -> {
+												debug( "There is an unresolved inner class signature '{}' in '{}'."
+														, canClsnamOfNested, cx.name
+														);
+												return Stream.empty();
+											});
+								})
 								.collect(Collectors.toList()),
 							Collectors.toSet()
 							).stream()
-					.map((cn) -> FragmentName.forClassName(cn.name))
+					.map((cn) -> FragmentName.forCanoicalClassName(cn.name))
 //					.collect(Collectors.toSet())
 					;
 		}
@@ -1549,7 +1562,7 @@ public class DivisionExecutor {
 			
 			if ( markPropagateOption.isByInnerClassSignature() ){
 				for ( FragmentName o : markOrigin ){
-					myexapnd.putAll(o, propagateInnerClassReferencesWhenTopLeveClass(o).collect(Collectors.toSet()) );
+					myexapnd.putAll(o, propagateInnerClassReferencesInJarWhenTopLeveClass(o).collect(Collectors.toSet()) );
 				}
 			}
 			

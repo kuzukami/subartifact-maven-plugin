@@ -80,7 +80,11 @@ interface FragmentName extends Comparable<FragmentName>{
 	}
 	
 	public static FragmentName forClassName( String classname ){
-		String x = classname.replace(".", "/") + ".class";
+		return forCanoicalClassName( classname.replace(".", "/") );
+	}
+	
+	public static FragmentName forCanoicalClassName( String classname ){
+		String x = classname + ".class";
 		return new ClassName(x);
 	}
 	

@@ -12,6 +12,7 @@ import java.util.stream.Stream;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InnerClassNode;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicates;
@@ -112,12 +113,17 @@ class DetailJarAnalysis {
 	public BiMap<FragmentName,MyJarEntry> getEntries(){
 		return index.getEntries();
 	}
+	public Optional<ClassNode> getClassNode( InnerClassNode classname ){
+		return getClassNode(FragmentName.forJarEntryName(classname.name + ".class" ));
+	}
 	
 	public Optional<ClassNode> getClassNode( String classname ){
 		return getClassNode(FragmentName.forClassName(classname));
 	}
 	public Optional<ClassNode> getClassNode( FragmentName classfragment ){
-		return getClassNode(getEntry(classfragment));
+		MyJarEntry je = getEntry(classfragment);
+		if ( je == null ) return Optional.empty();
+		return getClassNode(je);
 	}
 	
 	public Optional<ClassNode> getClassNode(  MyJarEntry entry ){

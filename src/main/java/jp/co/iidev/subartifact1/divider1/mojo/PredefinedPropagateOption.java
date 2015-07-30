@@ -10,7 +10,7 @@ public enum PredefinedPropagateOption {
 			return m;
 		}
 	},
-	PACKAGE_INFO_MARKS_PACKAGE_CLASSES_AND_RESOURCES{
+	PACKAGE_INFO_MARKS_ALL_OF_PACKAGE{
 		@Override
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();
@@ -18,7 +18,18 @@ public enum PredefinedPropagateOption {
 			return m;
 		}
 	},
-	PACKAGE_INFO_MARKS_PACKAGE_CLASSES {
+	PACKAGE_INFO_MARKS_PACKAGE_TOPLEVELCLASSES_AND_RESOURCES{
+		@Override
+		public OptionalPropagation getAsOption() {
+			OptionalPropagation m = new OptionalPropagation();
+			m.bySimpleClassNameInPacakge = "package-info";
+			m.getTargetResourceTypeOR().clear();
+			m.getTargetResourceTypeOR().add(ResourceType.Resource);
+			m.getTargetResourceTypeOR().add(ResourceType.TopLevelClass);
+			return m;
+		}
+	},
+	PACKAGE_INFO_MARKS_PACKAGE_TOPLEVELCLASSES {
 		@Override
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();
@@ -28,11 +39,11 @@ public enum PredefinedPropagateOption {
 			return m;
 		}
 	},
-	IID_JRES_MARKS_PACKAGE_RESOURCES {
+	IID_RES_MARKS_PACKAGE_RESOURCES {
 		@Override
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();
-			m.bySimpleClassNameInPacakge = "JRes";
+			m.bySimpleClassNameInPacakge = "Res";
 			m.targetResourceTypeOR.clear();
 			m.targetResourceTypeOR.add( ResourceType.Resource );
 			return m;
