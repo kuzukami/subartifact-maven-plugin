@@ -1,8 +1,12 @@
 package jp.co.iidev.subartifact1.divider1;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -10,6 +14,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -41,6 +46,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.common.io.CharStreams;
 
@@ -223,17 +229,26 @@ public class DivisionExecutor {
 							subartifacts_FirstOneIsRoot.skip(1)),
 					adjacencyFunction(clzpath),
 					subartifacts_FirstOneIsRoot.get(0), pa);
-			return pa.integrateFullPlanOrderedByBuildSequence((art) -> {
-				if (art instanceof LibArtifact) {
-					LibArtifact la = (LibArtifact) art;
-					return outputClasspathAliveFilter.apply(la.jarFile);
-				}
-				return true;
-			}).stream().collect(
-					Collectors.toMap((v) -> v.target, (v) -> v, (v1, v2) -> {
-						throw new RuntimeException("duplicated reports. bug?:"
-								+ v1 + " <=> " + v2);
-					} , LinkedHashMap::new));
+			LinkedHashMap<SubArtifactDefinition, SubArtifactDeployment> deployments
+			=  pa.integrateFullPlanOrderedByBuildSequence(
+					(art) -> {
+						//lib artifact filter
+						if (art instanceof LibArtifact) {
+							LibArtifact la = (LibArtifact) art;
+							return outputClasspathAliveFilter.apply(la.jarFile);
+						}
+						return true;
+					}).stream().collect(
+							//collect to LinkedHashMap
+							Collectors.toMap((v) -> v.target, (v) -> v, (v1, v2) -> {
+								throw new RuntimeException("duplicated reports. bug?:"
+										+ v1 + " <=> " + v2);
+							} , LinkedHashMap::new));
+			
+			
+			return  deployments;
+
+			
 		} catch (CyclicArtifact e) {
 			e.logReasonAsError(log);
 			throw e;
@@ -1004,26 +1019,37 @@ public class DivisionExecutor {
 
 	public static class SubArtifactDeployment {
 		private final SubArtifactDefinition target;
+		private final ArtifactFragment targetFragment;
 		private final List<SubArtifactDefinition> subartDeps;
 		private final LinkedHashMap<File, Dependency> jarDeps;
 //		private final List<String> deployClassNames;
 		private final List<String> resources;
+		private final String traceLog;
 
 		protected SubArtifactDeployment(SubArtifactDefinition target,
+				ArtifactFragment targetFragment,
 				List<SubArtifactDefinition> subartDeps,
 				LinkedHashMap<File, Dependency> jarDeps,
 //				List<String> deployClassNames,
-				List<String> resources) {
+				List<String> resources,
+				FullTracablePlanAcceptor forTraceLog
+				) {
 			super();
 			this.target = target;
 			this.subartDeps = subartDeps;
 			this.jarDeps = jarDeps;
 //			this.deployClassNames = deployClassNames;
 			this.resources = resources;
+			this.targetFragment = targetFragment;
+			this.traceLog = traceLog(forTraceLog);
 		}
 
 		public SubArtifactDefinition getTarget() {
 			return target;
+		}
+
+		public String getTraceLog() {
+			return traceLog;
 		}
 
 		public List<SubArtifactDefinition> getSubartDeps() {
@@ -1041,6 +1067,44 @@ public class DivisionExecutor {
 		public List<String> getResources() {
 			return resources;
 		}
+		
+		private String traceLog( FullTracablePlanAcceptor f){
+			try ( StringWriter sw = new StringWriter(); PrintWriter pw = new PrintWriter(sw) ){
+				printTraceLog(f, pw);
+				pw.flush();;
+				return sw.toString();
+			} catch (IOException e) {
+				//would not happen
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private void printTraceLog( FullTracablePlanAcceptor f, PrintWriter out ){
+			f.reportStream()
+			.filter( (deployLocation2deploymentFragment) -> 
+					targetFragment.equals( deployLocation2deploymentFragment.getKey() ) )
+			.forEach((ent) -> {
+				ArtifactFragment deployAnchor = ent.getKey();
+				List<jp.co.iidev.subartifact1.divider1.DivisionExecutor.FullTracablePlanAcceptor.DeploymentUnit> list_of_deployee = ent.getValue();
+
+				out.println( "Sub-Artifact Deployment Description : " + deployAnchor.toString());
+				
+				if (deployAnchor instanceof DivisionExecutor.SubArtifactRoot) {
+					DivisionExecutor.SubArtifactRoot submod = (DivisionExecutor.SubArtifactRoot) deployAnchor;
+					submod.getRootMemberNames().stream().sorted()
+							.forEach((c) -> {
+						out.println("  **Sub-Artifact Root : " + c.toString());
+					});
+
+				}
+				for (jp.co.iidev.subartifact1.divider1.DivisionExecutor.FullTracablePlanAcceptor.DeploymentUnit deployee : list_of_deployee) {
+					out.println("  Sub-Artifact Dependency : "
+							+ deployee.deployeeFragment.toString());
+					for (String reasonline : deployee.getReason(2))
+						out.println(reasonline);
+				}
+			});
+		}
 
 	}
 
@@ -1049,17 +1113,33 @@ public class DivisionExecutor {
 				.create();
 		private List<DeploymentUnit> deployments = Lists.newArrayList();
 		String tabPad = "  ";
+		
 
-		public void finalReport() {
-
+		public Stream<Entry<ArtifactFragment,List<DeploymentUnit>>> reportStream() {
+			return
 			deployments.stream().sorted(ducmp())
-					.collect(Collectors
-							.groupingBy((du) -> du.deploymentLocationArtifact))
-					.entrySet().stream()
-					// building order
-					.sorted(Comparator
-							.comparing((e) -> buildingOrderOfOutputArtifacts
-									.get(e.getKey())))
+			.collect(Collectors
+					.groupingBy((du) -> du.deploymentLocationArtifact))
+			.entrySet().stream()
+			// building order
+			.sorted(Comparator
+					.comparing((e) -> buildingOrderOfOutputArtifacts
+							.get(e.getKey())))
+			;
+		}
+		//will be removed
+		@Deprecated
+		private void finalReport() {
+
+//			deployments.stream().sorted(ducmp())
+//					.collect(Collectors
+//							.groupingBy((du) -> du.deploymentLocationArtifact))
+//					.entrySet().stream()
+//					// building order
+//					.sorted(Comparator
+//							.comparing((e) -> buildingOrderOfOutputArtifacts
+//									.get(e.getKey())))
+			reportStream()
 					.forEach((ent) -> {
 						ArtifactFragment deployAnchor = ent.getKey();
 						List<DeploymentUnit> list_of_deployee = ent.getValue();
@@ -1267,10 +1347,15 @@ public class DivisionExecutor {
 							main);
 					emptyOmitSet.add(main);
 				} else {
-					List<String> resources = Lists.newArrayList();
 					SubArtifactDeployment sa = new SubArtifactDeployment(
-							main.artifactDefinition, subart_deps, jardeps,
-							deployResources);
+							main.artifactDefinition,
+							main,
+							subart_deps, jardeps,
+//							deployResources
+							Ordering.natural().sortedCopy(deployResources)
+							,
+							this
+							);
 					l.add(sa);
 				}
 			}
@@ -1280,8 +1365,7 @@ public class DivisionExecutor {
 
 		@Override
 		public void close() {
-			finalReport();
-			;
+//			finalReport();
 		}
 	}
 

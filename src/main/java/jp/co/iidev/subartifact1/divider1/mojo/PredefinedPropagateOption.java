@@ -9,7 +9,7 @@ public enum PredefinedPropagateOption {
 			return m;
 		}
 	},
-	PACKAGE_INFO_MARKS_ALL_OF_PACKAGE{
+	PACKAGE_INFO_MARKS_ALL_IN_PACKAGE{
 		@Override
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();
@@ -63,7 +63,7 @@ public enum PredefinedPropagateOption {
 			return m;
 		}
 	},
-	IID_RES_MARKS_PACKAGE_RESOURCES {
+	IID_RES_MARKS_RESOURCES_IN_PACKAGE {
 		@Override
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();

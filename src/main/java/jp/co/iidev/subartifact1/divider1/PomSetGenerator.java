@@ -39,13 +39,16 @@ public class PomSetGenerator {
 	final Path fullArtifactPomRelativeByNewProjectDir;
 	final Path pomSetGenerationDir;
 	final Path templatePomSetGenerationDir;
+	
+	final Loggable lga;
 
-	public PomSetGenerator(Path fullArtifactPom, Path pomSetGenerationDir, Path templatePomSetGenerationDir) {
+	public PomSetGenerator(Path fullArtifactPom, Path pomSetGenerationDir, Path templatePomSetGenerationDir, LoggableFactory lf ) {
 		this.pomSetGenerationDir = pomSetGenerationDir;
 		this.templatePomSetGenerationDir = templatePomSetGenerationDir;
 		this.fullArtifactPomRelativeByNewProjectDir = pomSetGenerationDir
 				.resolve("tesueito")//once deeper 
 				.relativize(fullArtifactPom);
+		this.lga = lf.createLoggable(PomSetGenerator.class);
 	}
 
 	public static class GenProject {
@@ -278,6 +281,9 @@ public class PomSetGenerator {
 			this.templatePomFileNowExists = templatePomFile;
 		}
 		
+		public File fileOfPomDir( String name ){
+			return new File( pomFileGenerated.getParentFile(), name );
+		}
 	}
 	
 	private PomSetup initializePOM(
@@ -345,6 +351,8 @@ public class PomSetGenerator {
 					.render(p.templatePomFileNowExists);
 			Files.write(renderedXML, p.pomFileGenerated, Charsets.UTF_8);
 			parentPomGenerated = p.pomFileGenerated; 
+			
+			lga.info("A parent pom of generated subartifacts is generated in {}.", p.pomFileGenerated.toString() );
 		}
 		
 		
@@ -387,8 +395,18 @@ public class PomSetGenerator {
 			String renderedXML = Thymeleafs.start()
 					.add("genproject", ge)
 					.render(p.templatePomFileNowExists);
+			
+			lga.info("Subartifact pom is generated in {}", p.pomFileGenerated.toString() );
 			Files.write(renderedXML, p.pomFileGenerated, Charsets.UTF_8);
+			
+			if ( me.getValue().getTraceLog() != null ){
+				File f = p.fileOfPomDir("trace-log.txt");
+				lga.info("Subartifact trace-log is generated in {}", f.toString() );
+				Files.write(me.getValue().getTraceLog(), f, Charsets.UTF_8);
+			}
 		}
+		
+		lga.info("POM generation is completed. Run 'mvn install' of {}.", parentPomGenerated.toString() );
 	}
 
 	/**

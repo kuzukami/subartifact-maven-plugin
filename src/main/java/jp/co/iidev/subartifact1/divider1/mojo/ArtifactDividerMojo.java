@@ -239,7 +239,8 @@ public class ArtifactDividerMojo extends AbstractMojo {
 				new PomSetGenerator(
 						project.getBasedir().toPath().resolve("pom.xml"),
 						outputDirectory.toPath(),
-						templateOutputDirectory.toPath()
+						templateOutputDirectory.toPath(),
+						lf
 						).generate(groupId,
 								version,
 								this.subArtifactsParentArtifactId,
