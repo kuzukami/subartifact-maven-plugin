@@ -15,7 +15,7 @@ public class SubArtifact implements SubArtifactDefinition {
 	private boolean inheritsOuterDefaultRootSourceReferencePropagations = true;
 	private boolean inheritsOuterDefaultSubartifactSourceReferencePropagations = true;
 	
-	private RootMark[] rootMarks = new RootMark[0];
+	private RootSet[] rootSets = new RootSet[0];
 	
 	private OptionalPropagation[] defaultRootTransitivePropagations = new OptionalPropagation[0];
 	
@@ -46,11 +46,11 @@ public class SubArtifact implements SubArtifactDefinition {
 		 this.extraDependencies = extraDependencies;
 	 }
 	 @Override
-	 public RootMark[] getRootMarks() {
-		 return rootMarks == null ? new RootMark[0] : rootMarks;
+	 public RootSet[] getRootSets() {
+		 return rootSets == null ? new RootSet[0] : rootSets;
 	 }
-	 public void setRootMarks( RootMark[] x ) {
-		 this.rootMarks = x;
+	 public void setRootSets( RootSet[] x ) {
+		 this.rootSets = x;
 	 }
 	 
 	public OptionalPropagation[] getDefaultRootTransitivePropagations( OptionalPropagation[] externalTranstive ) {

@@ -2,7 +2,7 @@ package jp.co.iidev.subartifact1.divider1.mojo;
 
 import org.apache.commons.lang3.ArrayUtils;
 
-public class RootMark {
+public class RootSet {
 	
 	 String byAnnotation = null;
 	 String byIncludeResourcePattern = null;

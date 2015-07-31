@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InnerClassNode;
@@ -28,6 +29,7 @@ import com.google.common.collect.Multimap;
 
 import jp.co.iidev.subartifact1.divider1.JARIndex.MyJarEntry;
 import jp.co.iidev.subartifact1.divider1.asmhack.CollectingRemapper;
+import jp.co.iidev.subartifact1.divider1.mojo.ResourceType;
 
 class DetailJarAnalysis {
 	private final JARIndex index;
@@ -89,6 +91,9 @@ class DetailJarAnalysis {
 		return binaryCache.getUnchecked(getEntry(o));
 	}
 
+	public ResourceType getResourceType( FragmentName fn ){
+		return ResourceType.maps( getClassNode(getEntry(fn)) );
+	}
 
 	public Stream<JARIndex.MyJarEntry> annotatedClasses(
 			Set<String> annotationClassName) {

@@ -3,6 +3,7 @@ package jp.co.iidev.subartifact1.divider1;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InnerClassNode;
 
@@ -29,6 +30,12 @@ public class ClassNodes {
 		}
 		
 		return r;
+	}
+	public static boolean isPublic( ClassNode cn ){
+		return ( cn.access & Opcodes.ACC_PUBLIC ) != 0;
+	}
+	public static boolean isTopLevel( ClassNode cn ){
+		return !cn.name.contains("$");
 	}
 
 }

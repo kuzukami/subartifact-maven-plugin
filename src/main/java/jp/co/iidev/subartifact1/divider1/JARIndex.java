@@ -171,15 +171,15 @@ class JARIndex implements AutoCloseable{
 			return Joiner.on(packageJoiner).join(getDiretoryPath());
 		}
 		
-		public ResourceType mapAsResourceType(){
-			if ( isClassFile() ){
-				if ( DetailJarAnalysis.isToplevelClass(this) )
-					return ResourceType.TopLevelClass;
-				else
-					return ResourceType.InnerClass;
-			}
-			return ResourceType.Resource;
-		}
+//		public ResourceType mapAsResourceType(){
+//			if ( isClassFile() ){
+//				if ( DetailJarAnalysis.isToplevelClass(this) )
+//					return ResourceType.TopLevelClass;
+//				else
+//					return ResourceType.InnerClass;
+//			}
+//			return ResourceType.Resource;
+//		}
 		
 		private int getBasenameStartIndex(){
 			return jarEntryName.lastIndexOf("/") + 1;

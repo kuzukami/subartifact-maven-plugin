@@ -56,7 +56,7 @@ import jp.co.iidev.subartifact1.divider1.ArtifactDivisionPlanner.ReferenceInspec
 import jp.co.iidev.subartifact1.divider1.DivisionExecutor.RelocatablesClassPathUnit.Relocatable;
 import jp.co.iidev.subartifact1.divider1.JARIndex.MyJarEntry;
 import jp.co.iidev.subartifact1.divider1.mojo.OptionalPropagation;
-import jp.co.iidev.subartifact1.divider1.mojo.RootMark;
+import jp.co.iidev.subartifact1.divider1.mojo.RootSet;
 import jp.co.iidev.subartifact1.divider1.mojo.SubArtifact;
 
 public class DivisionExecutor {
@@ -148,7 +148,7 @@ public class DivisionExecutor {
 			rootSubart = new SubArtifact();
 			rootSubart.setArtifactId(rootSubartifactId);
 			rootSubart.setExtraDependencies(new Dependency[0]);
-			rootSubart.setRootMarks(new RootMark[0]);
+			rootSubart.setRootSets(new RootSet[0]);
 			// rootSubart.setOmittableIfEmpty(true);
 		}
 
@@ -699,7 +699,7 @@ public class DivisionExecutor {
 			Set<FragmentName> marked =
 			resource
 			.newMarker()
-			.mark(submodule.getRootMarks(),
+			.mark(submodule.getRootSets(),
 					submodule.getDefaultRootTransitivePropagations(outerDefaultRootTranstivePropagations)
 					,
 					submodule.getDefaultRootSourceReferencePropagations(outerDefaultRootReferencePropagations)
@@ -1362,13 +1362,13 @@ public class DivisionExecutor {
 
 
 			public SubsetMarker mark( 
-					RootMark[] markORs, OptionalPropagation[] externalRootTransitives, 
+					RootSet[] markORs, OptionalPropagation[] externalRootTransitives, 
 					OptionalPropagation[] externalReferences ){
 				if ( markORs == null ) return this;
 				
 //				while(true) {
 //					int os = currentRoot.size();
-					for ( RootMark r : markORs )
+					for ( RootSet r : markORs )
 						mark(r
 								, r.getRootTransitivePropagations( externalRootTransitives )
 								, r.getRootSourceReferencePropagations( externalReferences ));
@@ -1381,7 +1381,7 @@ public class DivisionExecutor {
 
 			
 			private SubsetMarker mark( 
-					RootMark mark, OptionalPropagation[] forRootTransitive , OptionalPropagation[] forSourceReference ){
+					RootSet mark, OptionalPropagation[] forRootTransitive , OptionalPropagation[] forSourceReference ){
 				Set<FragmentName> rootsExpanding = Sets.newHashSet();
 				if ( mark.getByAnnotation() != null ){
 					rootsExpanding.addAll( getAnnotated( Arrays.asList( mark.getByAnnotation() ) ) );
@@ -1606,7 +1606,7 @@ public class DivisionExecutor {
 			Multimaps.filterValues(
 					myexapnd, 
 					(v) -> {
-						return markPropagateOption.getTargetResourceTypeOR().contains( index.getEntry(v).mapAsResourceType() );
+						return markPropagateOption.getTargetResourceTypeOR().contains( index.getResourceType(v) );
 					} );
 			
 			

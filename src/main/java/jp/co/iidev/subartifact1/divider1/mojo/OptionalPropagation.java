@@ -39,5 +39,5 @@ public class OptionalPropagation{
 	public PredefinedPropagateOption getByPredefined() {
 		return byPredefined;
 	}
-	
+
 }

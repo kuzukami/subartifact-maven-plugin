@@ -6,7 +6,6 @@ public enum PredefinedPropagateOption {
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();
 			m.byInnerClassSignature = true;
-//			m.transitvePropagate = true;
 			return m;
 		}
 	},
@@ -18,24 +17,49 @@ public enum PredefinedPropagateOption {
 			return m;
 		}
 	},
-	PACKAGE_INFO_MARKS_PACKAGE_TOPLEVELCLASSES_AND_RESOURCES{
+	PACKAGE_INFO_MARKS_PUBLICACCESSSTOPLEVELCLASSES_AND_RESOURCES_IN_PACKAGE{
 		@Override
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();
 			m.bySimpleClassNameInPacakge = "package-info";
 			m.getTargetResourceTypeOR().clear();
 			m.getTargetResourceTypeOR().add(ResourceType.Resource);
-			m.getTargetResourceTypeOR().add(ResourceType.TopLevelClass);
+			m.getTargetResourceTypeOR().add(ResourceType.PublicAccessTopLevelClass);
+			
 			return m;
 		}
 	},
-	PACKAGE_INFO_MARKS_PACKAGE_TOPLEVELCLASSES {
+	PACKAGE_INFO_MARKS_PUBLICTOPLEVELCLASSES_IN_PACKAGE {
 		@Override
 		public OptionalPropagation getAsOption() {
 			OptionalPropagation m = new OptionalPropagation();
 			m.bySimpleClassNameInPacakge = "package-info";
 			m.targetResourceTypeOR.clear();
-			m.targetResourceTypeOR.add( ResourceType.TopLevelClass );
+			m.targetResourceTypeOR.add( ResourceType.PublicAccessTopLevelClass );
+//			m.targetResourceTypeOR.add( ResourceType.PackageTopLevelClass );
+			return m;
+		}
+	},
+	PACKAGE_INFO_MARKS_DEFAULTACCESSTOPLEVELCLASSES_IN_PACKAGE {
+		@Override
+		public OptionalPropagation getAsOption() {
+			OptionalPropagation m = new OptionalPropagation();
+			m.bySimpleClassNameInPacakge = "package-info";
+			m.targetResourceTypeOR.clear();
+			m.targetResourceTypeOR.add( ResourceType.DefaultAccessTopLevelClass );
+//			m.targetResourceTypeOR.add( ResourceType.PackageTopLevelClass );
+			return m;
+		}
+	},
+	PACKAGE_INFO_MARKS_RESOURCES_IN_PACKAGE{
+		@Override
+		public OptionalPropagation getAsOption() {
+			OptionalPropagation m = new OptionalPropagation();
+			m.bySimpleClassNameInPacakge = "package-info";
+			m.getTargetResourceTypeOR().clear();
+			m.getTargetResourceTypeOR().add(ResourceType.Resource);
+//			m.getTargetResourceTypeOR().add(ResourceType.PublicTopLevelClass);
+			
 			return m;
 		}
 	},
@@ -55,7 +79,8 @@ public enum PredefinedPropagateOption {
 			OptionalPropagation m = new OptionalPropagation();
 			m.byServicesFileContents = true;
 			m.targetResourceTypeOR.clear();
-			m.targetResourceTypeOR.add( ResourceType.TopLevelClass );
+			m.targetResourceTypeOR.add( ResourceType.PublicAccessTopLevelClass );
+			m.targetResourceTypeOR.add( ResourceType.DefaultAccessTopLevelClass );
 			m.targetResourceTypeOR.add( ResourceType.InnerClass );
 			return m;
 		}
